@@ -1,0 +1,73 @@
+import type { BibleVerse } from '@/domain/bible/bible';
+import bibleService from '@/services/bible';
+import type { BibleLang } from '@/components/bible/types';
+import type { DisplayVerse } from '@/components/bible/types';
+import { useCustomQuery } from '@/hooks/use-custom-query';
+
+/** 성경 데이터는 변경되지 않으므로 장기 캐시 (1년) */
+const BIBLE_STALE_TIME = 1000 * 60 * 60 * 24 * 365;
+const BIBLE_GC_TIME = 1000 * 60 * 60 * 24 * 365;
+
+export type UseBibleQueryParams = {
+  bookCode: string;
+  chapter: number;
+  primaryLang: BibleLang;
+  dualLang: boolean;
+  secondaryLang: BibleLang;
+};
+
+/** API가 언어별로 verse를 number 또는 string으로 줄 수 있으므로 항상 number로 정규화 (관심/메모 절 번호 매칭용) */
+function normalizeToDisplayVerse(
+  primary: BibleVerse[],
+  secondary?: BibleVerse[]
+): DisplayVerse[] {
+  const normalizedPrimary = Array.isArray(primary) ? primary : [];
+  const normalizedSecondary = Array.isArray(secondary) ? secondary : [];
+  const seenVerses = new Set<number>();
+  return normalizedPrimary.reduce<DisplayVerse[]>((items, p, index) => {
+    const rawVerse = p.verse;
+    const verse =
+      typeof rawVerse === 'number' && !Number.isNaN(rawVerse)
+        ? rawVerse
+        : Number(rawVerse) || index + 1;
+    if (seenVerses.has(verse)) return items;
+    seenVerses.add(verse);
+    items.push({
+      verse,
+      primary: p.content ?? '',
+      ...(normalizedSecondary[index] != null && {
+        secondary: normalizedSecondary[index]?.content ?? '',
+      }),
+    });
+    return items;
+  }, []);
+}
+
+async function fetchBibleVerses(params: UseBibleQueryParams): Promise<DisplayVerse[]> {
+  const { bookCode, chapter, primaryLang, dualLang, secondaryLang } = params;
+
+  if (dualLang) {
+    const [primaryData, secondaryData] = await Promise.all([
+      bibleService.getBible({ bookCode, chapter, lang: primaryLang }),
+      bibleService.getBible({ bookCode, chapter, lang: secondaryLang }),
+    ]);
+    const primary: BibleVerse[] = Array.isArray(primaryData) ? primaryData : [];
+    const secondary: BibleVerse[] = Array.isArray(secondaryData) ? secondaryData : [];
+    return normalizeToDisplayVerse(primary, secondary);
+  }
+
+  const data = await bibleService.getBible({ bookCode, chapter, lang: primaryLang });
+  const normalized: BibleVerse[] = Array.isArray(data) ? data : [];
+  return normalizeToDisplayVerse(normalized);
+}
+
+export function useBibleQuery(params: UseBibleQueryParams) {
+  const { bookCode, chapter, primaryLang, dualLang, secondaryLang } = params;
+
+  return useCustomQuery({
+    queryKey: ['bible', bookCode, chapter, primaryLang, dualLang, secondaryLang],
+    queryFn: () => fetchBibleVerses(params),
+    staleTime: BIBLE_STALE_TIME,
+    gcTime: BIBLE_GC_TIME,
+  });
+}
