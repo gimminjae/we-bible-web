@@ -28,7 +28,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko" data-theme="light" suppressHydrationWarning>
-      <body className={`${notoSans.variable} ${mono.variable} antialiased`}>
+      <body className={`${notoSans.variable} ${mono.variable} antialiased`} suppressHydrationWarning>
         <Providers>
           <MobileShell>{children}</MobileShell>
         </Providers>

@@ -2,6 +2,7 @@
 
 import { ChevronDown, Download, Moon, Sun, Upload } from "lucide-react";
 import { useRef, useState } from "react";
+import { useShallow } from "zustand/react/shallow";
 
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { useAppSettings } from "@/contexts/app-settings";
@@ -20,18 +21,20 @@ export default function SettingsPage() {
   const { t } = useI18n();
   const { showToast } = useToast();
   const replacePersistedState = useAppStore((state) => state.replacePersistedState);
-  const storeState = useAppStore((state) => ({
-    theme: state.theme,
-    appLanguage: state.appLanguage,
-    bible: state.bible,
-    favorites: state.favorites,
-    memos: state.memos,
-    prayers: state.prayers,
-    plans: state.plans,
-    grassData: state.grassData,
-    grassTheme: state.grassTheme,
-    stepRewardUsedDate: state.stepRewardUsedDate,
-  }));
+  const storeState = useAppStore(
+    useShallow((state) => ({
+      theme: state.theme,
+      appLanguage: state.appLanguage,
+      bible: state.bible,
+      favorites: state.favorites,
+      memos: state.memos,
+      prayers: state.prayers,
+      plans: state.plans,
+      grassData: state.grassData,
+      grassTheme: state.grassTheme,
+      stepRewardUsedDate: state.stepRewardUsedDate,
+    })),
+  );
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [languagePickerOpen, setLanguagePickerOpen] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
