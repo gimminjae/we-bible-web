@@ -1,6 +1,6 @@
 export type BibleLang = 'ko' | 'en' | 'de';
 
-/** 저장용 성경 검색/읽기 정보 (cookie → localStorage → sqlite 순으로 저장) */
+/** 저장용 성경 검색/읽기 정보 (기본은 웹 SQLite 계층, 미지원 환경은 localStorage fallback) */
 export type BibleSearchInfo = {
   bookCode: string;
   chapter: number;
