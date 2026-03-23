@@ -2,14 +2,14 @@ import type { PersistedState } from "@/store/app-store";
 
 export type BackupPayload = {
   exportedAt: string;
-  source: "localStorage";
+  source: "sqlite" | "localStorage";
   data: PersistedState;
 };
 
 export function buildBackupPayload(state: PersistedState): BackupPayload {
   return {
     exportedAt: new Date().toISOString(),
-    source: "localStorage",
+    source: "sqlite",
     data: state,
   };
 }
@@ -28,7 +28,11 @@ export function downloadBackup(state: PersistedState): void {
 export async function readBackupFile(file: File): Promise<BackupPayload> {
   const text = await file.text();
   const parsed = JSON.parse(text) as BackupPayload;
-  if (!parsed || parsed.source !== "localStorage" || typeof parsed.data !== "object") {
+  if (
+    !parsed ||
+    (parsed.source !== "sqlite" && parsed.source !== "localStorage") ||
+    typeof parsed.data !== "object"
+  ) {
     throw new Error("Invalid backup file.");
   }
   return parsed;
