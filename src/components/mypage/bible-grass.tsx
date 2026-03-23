@@ -1,6 +1,6 @@
 "use client";
 
-import { CircleHelp } from "lucide-react";
+import { ChevronDown, CircleHelp } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { BottomSheet } from "@/components/ui/bottom-sheet";
@@ -14,6 +14,12 @@ import { useI18n } from "@/utils/i18n";
 
 const DAY_LABELS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
 const MONTH_KEYS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"] as const;
+type MonthKey = (typeof MONTH_KEYS)[number];
+
+const CELL_SIZE_REM = 0.875;
+const CELL_GAP_REM = 0.1875;
+const MONTH_GAP_REM = 0.3125;
+const DAY_LABEL_WIDTH_REM = 1.5;
 
 const GRASS_THEME_CLASSES: Record<GrassColorTheme, Record<0 | 1 | 2 | 3 | 4, string>> = {
   green: { 0: "bg-base-300", 1: "bg-emerald-700", 2: "bg-emerald-600", 3: "bg-emerald-500", 4: "bg-emerald-400" },
@@ -61,6 +67,37 @@ function buildGrid(year: number): CellInfo[][] {
   );
 }
 
+function getMonthLabels(year: number): Array<{ col: number; label: MonthKey }> {
+  const sundayStart = getSundayBefore(new Date(year, 0, 1));
+  const labels: Array<{ col: number; label: MonthKey }> = [];
+
+  MONTH_KEYS.forEach((monthKey, monthIndex) => {
+    const firstDay = new Date(year, monthIndex, 1);
+    const diffDays = Math.round((firstDay.getTime() - sundayStart.getTime()) / 86_400_000);
+    const col = Math.floor(diffDays / 7);
+    if (col >= 0 && col < 53) {
+      labels.push({ col, label: monthKey });
+    }
+  });
+
+  return labels;
+}
+
+function isFirstOfMonth(dateStr: string): boolean {
+  return dateStr.endsWith("-01");
+}
+
+function getColumnLeft(colIdx: number, grid: CellInfo[][], cellSizeRem: number, cellGapRem: number, monthGapRem: number): number {
+  let left = colIdx * (cellSizeRem + cellGapRem);
+  for (let column = 0; column < colIdx; column += 1) {
+    const hasMonthStart = grid.some((row) => isFirstOfMonth(row[column]?.dateStr ?? ""));
+    if (hasMonthStart) {
+      left += monthGapRem;
+    }
+  }
+  return left;
+}
+
 function formatChapterRanges(chapters: number[]): string {
   if (!chapters.length) return "";
   const sorted = [...chapters].sort((left, right) => left - right);
@@ -105,6 +142,11 @@ export function BibleGrass() {
 
   const themeClasses = GRASS_THEME_CLASSES[grassTheme];
   const grid = useMemo(() => buildGrid(selectedYear), [selectedYear]);
+  const monthLabels = useMemo(() => getMonthLabels(selectedYear), [selectedYear]);
+  const gridTrackWidthRem = useMemo(
+    () => getColumnLeft(52, grid, CELL_SIZE_REM, CELL_GAP_REM, MONTH_GAP_REM) + CELL_SIZE_REM,
+    [grid],
+  );
   const totalChapters = useMemo(
     () =>
       grid.flat().reduce((sum, cell) => {
@@ -163,9 +205,8 @@ export function BibleGrass() {
   return (
     <section className="rounded-[1.75rem] border border-base-300 bg-base-100 p-5 shadow-sm">
       <div className="mb-4 flex items-start justify-between gap-3">
-        <div className="space-y-1">
-          <p className="text-xs uppercase tracking-[0.25em] text-base-content/45">Bible Grass</p>
-          <h2 className="text-lg font-semibold">
+        <div className="flex flex-1 items-start gap-2 pr-2">
+          <p className="pt-0.5 text-sm leading-6 text-base-content/70">
             {includesYesterday
               ? streak <= 6
                 ? t("grass.streakStart")
@@ -175,58 +216,100 @@ export function BibleGrass() {
               : totalChapters > 0
                 ? t("grass.streakStart")
                 : t("grass.streakNone")}
-          </h2>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button type="button" className="btn btn-ghost btn-sm btn-circle" onClick={() => setGuideOpen(true)}>
+          </p>
+          <button type="button" className="btn btn-ghost btn-sm btn-circle mt-0.5 shrink-0" onClick={() => setGuideOpen(true)}>
             <CircleHelp className="size-4" />
           </button>
-          <button type="button" className="btn btn-sm btn-ghost border border-base-300" onClick={() => setYearPickerOpen(true)}>
-            {selectedYear}
-          </button>
         </div>
+
+        <button type="button" className="btn btn-sm btn-ghost min-w-20 justify-between gap-2 border border-base-300 px-4" onClick={() => setYearPickerOpen(true)}>
+          {selectedYear}
+          <ChevronDown className="size-4 opacity-60" />
+        </button>
       </div>
 
       <div className="overflow-x-auto pb-2">
-        <div className="min-w-[42rem]">
-          <div className="mb-1 grid grid-cols-[2rem_repeat(53,minmax(0,1fr))] gap-1 text-[10px] text-base-content/50">
-            <div />
-            {Array.from({ length: 53 }, (_, columnIndex) => {
-              const label = MONTH_KEYS.find((monthKey, monthIndex) => {
-                const firstDay = new Date(selectedYear, monthIndex, 1);
-                const sundayStart = getSundayBefore(new Date(selectedYear, 0, 1));
-                const diffDays = Math.round((firstDay.getTime() - sundayStart.getTime()) / 86_400_000);
-                return Math.floor(diffDays / 7) === columnIndex;
-              });
-              return <div key={columnIndex}>{label ? t(`grass.month.${label}`) : ""}</div>;
-            })}
-          </div>
-
-          <div className="grid grid-cols-[2rem_repeat(53,minmax(0,1fr))] gap-1">
-            {DAY_LABELS.map((dayKey, rowIndex) => (
-              <div key={dayKey} className="contents">
-                <div className="text-[10px] leading-5 text-base-content/50">{t(`grass.day.${dayKey}`)}</div>
-                {grid[rowIndex].map((cell, columnIndex) => {
-                  if (!cell.dateStr) {
-                    return <div key={`${dayKey}-${columnIndex}`} className="aspect-square rounded bg-transparent" />;
-                  }
-                  const count = getChapterCountForDate(grassData, cell.dateStr);
-                  const filledByPoint = grassData[cell.dateStr]?.fillYn === true;
-                  const level = count <= 0 ? (filledByPoint ? 1 : 0) : count >= 10 ? 4 : count >= 5 ? 3 : count >= 3 ? 2 : 1;
-                  return (
-                    <button
-                      key={`${dayKey}-${columnIndex}`}
-                      type="button"
-                      className={`aspect-square rounded-sm text-[9px] font-semibold text-white ${themeClasses[level as 0 | 1 | 2 | 3 | 4]}`}
-                      onClick={() => setSelectedDate(cell.dateStr)}
-                    >
-                      {cell.dateStr.slice(-2).replace(/^0/, "")}
-                    </button>
-                  );
-                })}
+        <div style={{ minWidth: `${DAY_LABEL_WIDTH_REM + CELL_GAP_REM + gridTrackWidthRem}rem` }}>
+          <div
+            className="relative mb-1"
+            style={{
+              marginLeft: `${DAY_LABEL_WIDTH_REM + CELL_GAP_REM}rem`,
+              height: "1rem",
+              width: `${gridTrackWidthRem}rem`,
+            }}
+          >
+            {monthLabels.map(({ col, label }) => (
+              <div
+                key={`${col}-${label}`}
+                className="absolute whitespace-nowrap text-[10px] text-base-content/50"
+                style={{
+                  left: `${getColumnLeft(col, grid, CELL_SIZE_REM, CELL_GAP_REM, MONTH_GAP_REM)}rem`,
+                }}
+              >
+                {t(`grass.month.${label}`)}
               </div>
             ))}
+          </div>
+
+          <div className="flex" style={{ gap: `${CELL_GAP_REM}rem` }}>
+            <div style={{ width: `${DAY_LABEL_WIDTH_REM}rem` }}>
+              {DAY_LABELS.map((dayKey) => (
+                <div
+                  key={dayKey}
+                  className="text-[10px] text-base-content/50"
+                  style={{
+                    height: `${CELL_SIZE_REM + CELL_GAP_REM}rem`,
+                    lineHeight: `${CELL_SIZE_REM + CELL_GAP_REM}rem`,
+                  }}
+                >
+                  {t(`grass.day.${dayKey}`)}
+                </div>
+              ))}
+            </div>
+
+            <div className="flex" style={{ gap: `${CELL_GAP_REM}rem` }}>
+              {grid[0]?.map((_, columnIndex) => {
+                const hasMonthStart = grid.some((row) => isFirstOfMonth(row[columnIndex]?.dateStr ?? ""));
+
+                return (
+                  <div key={columnIndex} style={{ marginLeft: hasMonthStart ? `${MONTH_GAP_REM}rem` : 0 }}>
+                    <div className="flex flex-col" style={{ gap: `${CELL_GAP_REM}rem` }}>
+                      {grid.map((row, rowIndex) => {
+                        const cell = row[columnIndex];
+                        if (!cell?.dateStr) {
+                          return (
+                            <div
+                              key={rowIndex}
+                              className="rounded-[0.35rem] bg-transparent"
+                              style={{ width: `${CELL_SIZE_REM}rem`, height: `${CELL_SIZE_REM}rem` }}
+                            />
+                          );
+                        }
+
+                        const count = getChapterCountForDate(grassData, cell.dateStr);
+                        const filledByPoint = grassData[cell.dateStr]?.fillYn === true;
+                        const level = count <= 0 ? (filledByPoint ? 1 : 0) : count >= 10 ? 4 : count >= 5 ? 3 : count >= 3 ? 2 : 1;
+
+                        return (
+                          <button
+                            key={rowIndex}
+                            type="button"
+                            aria-label={formatShortDate(cell.dateStr)}
+                            aria-pressed={selectedDate === cell.dateStr}
+                            title={formatShortDate(cell.dateStr)}
+                            className={`block appearance-none rounded-[0.35rem] border-0 p-0 transition focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-base-content/40 focus-visible:ring-offset-1 focus-visible:ring-offset-base-100 ${
+                              selectedDate === cell.dateStr ? "ring-1 ring-base-content/40 ring-offset-1 ring-offset-base-100" : ""
+                            } ${themeClasses[level as 0 | 1 | 2 | 3 | 4]}`}
+                            style={{ width: `${CELL_SIZE_REM}rem`, height: `${CELL_SIZE_REM}rem` }}
+                            onClick={() => setSelectedDate(cell.dateStr)}
+                          />
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       </div>
@@ -236,7 +319,7 @@ export function BibleGrass() {
           <span>{t("grass.less")}</span>
           <div className="flex gap-1">
             {[0, 1, 2, 3, 4].map((level) => (
-              <div key={level} className={`h-3 w-3 rounded-sm ${themeClasses[level as 0 | 1 | 2 | 3 | 4]}`} />
+              <div key={level} className={`h-3.5 w-3.5 rounded-[0.35rem] ${themeClasses[level as 0 | 1 | 2 | 3 | 4]}`} />
             ))}
           </div>
           <span>{t("grass.more")}</span>
@@ -250,6 +333,7 @@ export function BibleGrass() {
       <div className="mt-4 border-t border-base-300 pt-4 text-sm leading-6 text-base-content/70">
         {selectedDate ? (
           <div className="space-y-3">
+            <p>{selectedDate}</p>
             <p>
               {(grassData[selectedDate]?.data.length ?? 0) > 0
                 ? selectedDate === toDateString(new Date())
@@ -299,7 +383,7 @@ export function BibleGrass() {
             <h3 className="font-semibold text-base-content">{t("grass.guide.colorTitle")}</h3>
             {[0, 1, 2, 3, 4].map((level) => (
               <div key={level} className="flex items-center gap-3">
-                <div className={`h-4 w-4 rounded-sm ${themeClasses[level as 0 | 1 | 2 | 3 | 4]}`} />
+                <div className={`h-4 w-4 rounded-[0.35rem] ${themeClasses[level as 0 | 1 | 2 | 3 | 4]}`} />
                 <span>{t(`grass.guide.color${level}`)}</span>
               </div>
             ))}
