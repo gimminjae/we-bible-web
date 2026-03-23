@@ -85,7 +85,7 @@ function getWebSqlDatabase(): Promise<WebSqlDatabase | null> {
   }
 
   if (!dbPromise) {
-    dbPromise = new Promise((resolve, reject) => {
+    dbPromise = new Promise<WebSqlDatabase | null>((resolve, reject) => {
       try {
         const database = window.openDatabase?.(
           DATABASE_NAME,
