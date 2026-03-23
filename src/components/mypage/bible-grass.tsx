@@ -8,6 +8,7 @@ import { getChapterCountForDate, getStreakUpToYesterday, type GrassColorTheme } 
 import { formatShortDate } from "@/lib/date";
 import { getBookName } from "@/services/bible";
 import { useAppSettings } from "@/contexts/app-settings";
+import { useDrawer } from "@/hooks/use-drawer";
 import { useToast } from "@/hooks/use-toast";
 import { isFreeRewardAvailable, useAppStore } from "@/store/app-store";
 import { useI18n } from "@/utils/i18n";
@@ -137,8 +138,8 @@ export function BibleGrass() {
   const markStepRewardUsed = useAppStore((state) => state.markStepRewardUsed);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [guideOpen, setGuideOpen] = useState(false);
-  const [yearPickerOpen, setYearPickerOpen] = useState(false);
+  const guideDrawer = useDrawer();
+  const yearPickerDrawer = useDrawer();
 
   const themeClasses = GRASS_THEME_CLASSES[grassTheme];
   const grid = useMemo(() => buildGrid(selectedYear), [selectedYear]);
@@ -217,12 +218,12 @@ export function BibleGrass() {
                 ? t("grass.streakStart")
                 : t("grass.streakNone")}
           </p>
-          <button type="button" className="btn btn-ghost btn-sm btn-circle mt-0.5 shrink-0" onClick={() => setGuideOpen(true)}>
+          <button type="button" className="btn btn-ghost btn-sm btn-circle mt-0.5 shrink-0" onClick={guideDrawer.open}>
             <CircleHelp className="size-4" />
           </button>
         </div>
 
-        <button type="button" className="btn btn-sm btn-ghost min-w-20 justify-between gap-2 border border-base-300 px-4" onClick={() => setYearPickerOpen(true)}>
+        <button type="button" className="btn btn-sm btn-ghost min-w-20 justify-between gap-2 border border-base-300 px-4" onClick={yearPickerDrawer.open}>
           {selectedYear}
           <ChevronDown className="size-4 opacity-60" />
         </button>
@@ -369,7 +370,7 @@ export function BibleGrass() {
         )}
       </div>
 
-      <BottomSheet open={guideOpen} onClose={() => setGuideOpen(false)} title={t("grass.guide.title")}>
+      <BottomSheet open={guideDrawer.isOpen} onClose={guideDrawer.close} title={t("grass.guide.title")}>
         <div className="space-y-5 pb-4 text-sm leading-6 text-base-content/70">
           <div>
             <h3 className="font-semibold text-base-content">{t("grass.guide.overviewTitle")}</h3>
@@ -391,7 +392,7 @@ export function BibleGrass() {
         </div>
       </BottomSheet>
 
-      <BottomSheet open={yearPickerOpen} onClose={() => setYearPickerOpen(false)} title={t("grass.selectYear")}>
+      <BottomSheet open={yearPickerDrawer.isOpen} onClose={yearPickerDrawer.close} title={t("grass.selectYear")}>
         <div className="space-y-2 pb-4">
           {years.map((year) => (
             <button
@@ -401,7 +402,7 @@ export function BibleGrass() {
               onClick={() => {
                 setSelectedYear(year);
                 setSelectedDate(null);
-                setYearPickerOpen(false);
+                yearPickerDrawer.close();
               }}
             >
               {year}

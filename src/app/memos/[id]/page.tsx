@@ -2,9 +2,10 @@
 
 import { Copy, Pencil, Trash2 } from "lucide-react";
 import { notFound, useParams, useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 
 import { MemoSheet } from "@/components/memos/memo-sheet";
+import { useDrawer } from "@/hooks/use-drawer";
 import { useHeader } from "@/hooks/use-header";
 import { copyText } from "@/lib/clipboard";
 import { formatShortDateTime } from "@/lib/date";
@@ -24,7 +25,7 @@ export default function MemoDetailPage() {
   const memo = useAppStore((state) => state.memos.find((item) => item.id === params.id));
   const updateMemo = useAppStore((state) => state.updateMemo);
   const deleteMemo = useAppStore((state) => state.deleteMemo);
-  const [editOpen, setEditOpen] = useState(false);
+  const editDrawer = useDrawer();
 
   const copyTextValue = useMemo(() => {
     if (!memo) return "";
@@ -48,7 +49,7 @@ export default function MemoDetailPage() {
           >
             <Copy className="size-4" />
           </button>
-          <button type="button" className="btn btn-sm btn-primary" onClick={() => setEditOpen(true)}>
+          <button type="button" className="btn btn-sm btn-primary" onClick={editDrawer.open}>
             <Pencil className="size-4" />
             {t("mypage.editMemo")}
           </button>
@@ -96,20 +97,19 @@ export default function MemoDetailPage() {
         </section>
       </div>
 
-      {editOpen ? (
-        <MemoSheet
-          open={editOpen}
-          onClose={() => setEditOpen(false)}
-          editMode
-          initialVerseText={memo.verseText}
-          initialTitle={memo.title}
-          initialContent={memo.content}
-          onSave={(title, content) => {
-            updateMemo(memo.id, title, content);
-            showToast(t("toast.memoUpdated"));
-          }}
-        />
-      ) : null}
+      <MemoSheet
+        key={editDrawer.version}
+        open={editDrawer.isOpen}
+        onClose={editDrawer.close}
+        editMode
+        initialVerseText={memo.verseText}
+        initialTitle={memo.title}
+        initialContent={memo.content}
+        onSave={(title, content) => {
+          updateMemo(memo.id, title, content);
+          showToast(t("toast.memoUpdated"));
+        }}
+      />
     </div>
   );
 }

@@ -2,9 +2,9 @@
 
 import { Copy, Plus } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
 
 import { MemoSheet } from "@/components/memos/memo-sheet";
+import { useDrawer } from "@/hooks/use-drawer";
 import { useHeader } from "@/hooks/use-header";
 import { copyText } from "@/lib/clipboard";
 import { formatShortDateTime } from "@/lib/date";
@@ -21,7 +21,7 @@ export default function MemosPage() {
   const { showToast } = useToast();
   const memos = useAppStore((state) => state.memos);
   const addMemo = useAppStore((state) => state.addMemo);
-  const [memoOpen, setMemoOpen] = useState(false);
+  const memoDrawer = useDrawer();
 
   useHeader(
     () => ({
@@ -29,7 +29,7 @@ export default function MemosPage() {
       eyebrow: t("common.back"),
       showBack: true,
       actions: (
-        <button type="button" className="btn btn-sm btn-primary" onClick={() => setMemoOpen(true)}>
+        <button type="button" className="btn btn-sm btn-primary" onClick={memoDrawer.open}>
           <Plus className="size-4" />
           {t("mypage.writeMemo")}
         </button>
@@ -70,16 +70,15 @@ export default function MemosPage() {
         )}
       </div>
 
-      {memoOpen ? (
-        <MemoSheet
-          open={memoOpen}
-          onClose={() => setMemoOpen(false)}
-          initialVerseText=""
-          onSave={(title, content) => {
-            addMemo({ title, content, verseText: "" });
-          }}
-        />
-      ) : null}
+      <MemoSheet
+        key={memoDrawer.version}
+        open={memoDrawer.isOpen}
+        onClose={memoDrawer.close}
+        initialVerseText=""
+        onSave={(title, content) => {
+          addMemo({ title, content, verseText: "" });
+        }}
+      />
     </div>
   );
 }

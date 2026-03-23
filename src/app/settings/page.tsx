@@ -6,6 +6,7 @@ import { useShallow } from "zustand/react/shallow";
 
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { useAppSettings } from "@/contexts/app-settings";
+import { useDrawer } from "@/hooks/use-drawer";
 import { buildBackupPayload, downloadBackup, readBackupFile } from "@/lib/backup";
 import { useHeader } from "@/hooks/use-header";
 import { useToast } from "@/hooks/use-toast";
@@ -37,8 +38,8 @@ export default function SettingsPage() {
     })),
   );
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [languagePickerOpen, setLanguagePickerOpen] = useState(false);
-  const [guideOpen, setGuideOpen] = useState(false);
+  const languagePickerDrawer = useDrawer();
+  const guideDrawer = useDrawer();
   const [isImporting, setIsImporting] = useState(false);
 
   useHeader(
@@ -81,7 +82,7 @@ export default function SettingsPage() {
       <section className="space-y-4 rounded-[1.75rem] border border-base-300 bg-base-100 p-5 shadow-sm">
         <div>
           <p className="label-text font-medium">{t("settings.systemLanguage")}</p>
-          <button type="button" className="btn btn-ghost mt-2 w-full justify-between border border-base-300" onClick={() => setLanguagePickerOpen(true)}>
+          <button type="button" className="btn btn-ghost mt-2 w-full justify-between border border-base-300" onClick={languagePickerDrawer.open}>
             <span>{LANGUAGE_OPTIONS.find((item) => item.value === appLanguage)?.label ?? "한국어"}</span>
             <ChevronDown className="size-4" />
           </button>
@@ -106,7 +107,7 @@ export default function SettingsPage() {
             <p className="label-text font-medium">{t("settings.account")}</p>
             <p className="mt-1 text-sm text-base-content/60">{t("settings.exportDesc")}</p>
           </div>
-          <button type="button" className="btn btn-sm btn-ghost border border-base-300" onClick={() => setGuideOpen(true)}>
+          <button type="button" className="btn btn-sm btn-ghost border border-base-300" onClick={guideDrawer.open}>
             {t("common.confirm")}
           </button>
         </div>
@@ -127,7 +128,7 @@ export default function SettingsPage() {
 
       </div>
 
-      <BottomSheet open={languagePickerOpen} onClose={() => setLanguagePickerOpen(false)} title={t("settings.languageSelect")}>
+      <BottomSheet open={languagePickerDrawer.isOpen} onClose={languagePickerDrawer.close} title={t("settings.languageSelect")}>
         <div className="grid gap-2 pb-4">
           {LANGUAGE_OPTIONS.map((option) => (
             <button
@@ -136,7 +137,7 @@ export default function SettingsPage() {
               className={`btn justify-start ${appLanguage === option.value ? "btn-primary" : "btn-ghost border border-base-300"}`}
               onClick={() => {
                 setAppLanguage(option.value);
-                setLanguagePickerOpen(false);
+                languagePickerDrawer.close();
               }}
             >
               {option.label}
@@ -145,7 +146,7 @@ export default function SettingsPage() {
         </div>
       </BottomSheet>
 
-      <BottomSheet open={guideOpen} onClose={() => setGuideOpen(false)} title={t("settings.exportImportGuideTitle")}>
+      <BottomSheet open={guideDrawer.isOpen} onClose={guideDrawer.close} title={t("settings.exportImportGuideTitle")}>
         <div className="pb-4 text-sm leading-7 text-base-content/70">{t("settings.exportImportGuideBody")}</div>
       </BottomSheet>
     </div>

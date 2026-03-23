@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import { MemoSheet } from "@/components/memos/memo-sheet";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { useAppSettings } from "@/contexts/app-settings";
+import { useDrawer } from "@/hooks/use-drawer";
 import { useBibleQuery } from "@/hooks/use-bible-query";
 import { useHeader } from "@/hooks/use-header";
 import { useToast } from "@/hooks/use-toast";
@@ -42,13 +43,13 @@ export default function BibleReaderPage() {
     scope: chapterScope,
     verses: [],
   });
-  const [bookPickerOpen, setBookPickerOpen] = useState(false);
+  const bookPickerDrawer = useDrawer();
   const [bookPickerStep, setBookPickerStep] = useState<"book" | "chapter">("book");
   const [bookPickerCategory, setBookPickerCategory] = useState<BibleCategoryKey>("ot");
   const [pickerBookCode, setPickerBookCode] = useState(bible.bookCode);
-  const [languagePickerOpen, setLanguagePickerOpen] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const [memoOpen, setMemoOpen] = useState(false);
+  const languagePickerDrawer = useDrawer();
+  const settingsDrawer = useDrawer();
+  const memoDrawer = useDrawer();
   const [secondarySelectorOpen, setSecondarySelectorOpen] = useState(false);
 
   const selectedVerses = useMemo(
@@ -103,7 +104,7 @@ export default function BibleReaderPage() {
                 setBookPickerStep("book");
                 setBookPickerCategory("ot");
                 setPickerBookCode(bible.bookCode);
-                setBookPickerOpen(true);
+                bookPickerDrawer.open();
               }}
             >
               {bookName} {bible.chapter}
@@ -111,7 +112,7 @@ export default function BibleReaderPage() {
             <button
               type="button"
               className="btn btn-sm btn-ghost rounded-2xl border border-base-300"
-              onClick={() => setLanguagePickerOpen(true)}
+              onClick={languagePickerDrawer.open}
             >
               {langLabel}
             </button>
@@ -120,7 +121,7 @@ export default function BibleReaderPage() {
           <button
             type="button"
             className="btn btn-sm btn-ghost btn-circle border border-base-300"
-            onClick={() => setSettingsOpen(true)}
+            onClick={settingsDrawer.open}
           >
             <Type className="size-4" />
           </button>
@@ -252,7 +253,7 @@ export default function BibleReaderPage() {
       secondaryLang: fallbackSecondary,
       dualLang: false,
     });
-    setLanguagePickerOpen(false);
+    languagePickerDrawer.close();
   };
 
   return (
@@ -318,7 +319,7 @@ export default function BibleReaderPage() {
             <button type="button" className="btn btn-circle btn-sm btn-ghost border border-base-300" onClick={handleFavoriteToggle}>
               {allSelectedAreFavorites ? <HeartOff className="size-4" /> : <Heart className="size-4" />}
             </button>
-            <button type="button" className="btn btn-circle btn-sm btn-ghost border border-base-300" onClick={() => setMemoOpen(true)}>
+            <button type="button" className="btn btn-circle btn-sm btn-ghost border border-base-300" onClick={memoDrawer.open}>
               <NotebookPen className="size-4" />
             </button>
             <button type="button" className="btn btn-primary rounded-full px-5" onClick={handleCopy}>
@@ -339,7 +340,7 @@ export default function BibleReaderPage() {
         </div>
       )}
 
-      <BottomSheet open={bookPickerOpen} onClose={() => setBookPickerOpen(false)}>
+      <BottomSheet open={bookPickerDrawer.isOpen} onClose={bookPickerDrawer.close}>
         {bookPickerStep === "book" ? (
           <div className="space-y-4 pb-4">
             <div className="flex flex-wrap gap-2">
@@ -397,7 +398,7 @@ export default function BibleReaderPage() {
                   className={`btn btn-sm ${chapter === bible.chapter && pickerBook.bookCode === bible.bookCode ? "btn-primary" : "btn-outline"}`}
                   onClick={() => {
                     goToBookChapter(pickerBook.bookCode, chapter);
-                    setBookPickerOpen(false);
+                    bookPickerDrawer.close();
                     setBookPickerStep("book");
                   }}
                 >
@@ -409,7 +410,7 @@ export default function BibleReaderPage() {
         )}
       </BottomSheet>
 
-      <BottomSheet open={languagePickerOpen} onClose={() => setLanguagePickerOpen(false)} title={t("settings.languageSelect")}>
+      <BottomSheet open={languagePickerDrawer.isOpen} onClose={languagePickerDrawer.close} title={t("settings.languageSelect")}>
         <div className="grid gap-2 pb-4">
           {versions.map((option) => (
             <button
@@ -424,7 +425,7 @@ export default function BibleReaderPage() {
         </div>
       </BottomSheet>
 
-      <BottomSheet open={settingsOpen} onClose={() => setSettingsOpen(false)}>
+      <BottomSheet open={settingsDrawer.isOpen} onClose={settingsDrawer.close}>
         <div className="space-y-5 pb-4">
           <div className="flex items-center justify-between rounded-[1.5rem] border border-base-300 bg-base-200 px-4 py-4">
             <div>
@@ -500,9 +501,7 @@ export default function BibleReaderPage() {
         </div>
       </BottomSheet>
 
-      {memoOpen ? (
-        <MemoSheet open={memoOpen} onClose={() => setMemoOpen(false)} initialVerseText={memoInitialContent} onSave={handleSaveMemo} />
-      ) : null}
+      <MemoSheet key={memoDrawer.version} open={memoDrawer.isOpen} onClose={memoDrawer.close} initialVerseText={memoInitialContent} onSave={handleSaveMemo} />
     </div>
   );
 }

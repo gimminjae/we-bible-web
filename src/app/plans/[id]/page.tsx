@@ -7,6 +7,7 @@ import { useMemo, useState } from "react";
 
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { useAppSettings } from "@/contexts/app-settings";
+import { useDrawer } from "@/hooks/use-drawer";
 import { useHeader } from "@/hooks/use-header";
 import { useToast } from "@/hooks/use-toast";
 import { BIBLE_BOOKS, updatePlanComputedFields } from "@/lib/plan";
@@ -26,6 +27,7 @@ export default function PlanDetailPage() {
   const [activeTab, setActiveTab] = useState<"ot" | "nt">("ot");
   const [selectedBookIndex, setSelectedBookIndex] = useState<number | null>(null);
   const [localStatus, setLocalStatus] = useState<number[]>([]);
+  const bookEditorDrawer = useDrawer();
 
   useHeader(
     () => ({
@@ -71,6 +73,7 @@ export default function PlanDetailPage() {
     if (bookIndex < 0) return;
     setSelectedBookIndex(bookIndex);
     setLocalStatus([...(currentPlan.goalStatus[bookIndex] ?? [])]);
+    bookEditorDrawer.open();
   };
 
   return (
@@ -146,7 +149,12 @@ export default function PlanDetailPage() {
         </div>
       </div>
 
-      <BottomSheet open={selectedBookIndex !== null && !!selectedBook} onClose={() => setSelectedBookIndex(null)} title={selectedBook ? getBookName(selectedBook.bookCode, appLanguage) : ""}>
+      <BottomSheet
+        open={bookEditorDrawer.isOpen && !!selectedBook}
+        onClose={bookEditorDrawer.close}
+        onAfterClose={() => setSelectedBookIndex(null)}
+        title={selectedBook ? getBookName(selectedBook.bookCode, appLanguage) : ""}
+      >
         {selectedBook ? (
           <div className="space-y-4 pb-4">
             <div className="flex flex-wrap gap-2">
@@ -181,7 +189,7 @@ export default function PlanDetailPage() {
                     nextStatus: [...localStatus],
                   });
                   showToast(t("toast.planUpdated"));
-                  setSelectedBookIndex(null);
+                  bookEditorDrawer.close();
                 }}
               >
                 {t("mypage.savePlan")}
