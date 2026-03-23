@@ -6,8 +6,8 @@ import { notFound, useParams, useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
 import { BottomSheet } from "@/components/ui/bottom-sheet";
-import { PageHeader } from "@/components/ui/page-header";
 import { useAppSettings } from "@/contexts/app-settings";
+import { useHeader } from "@/hooks/use-header";
 import { useToast } from "@/hooks/use-toast";
 import { BIBLE_BOOKS, updatePlanComputedFields } from "@/lib/plan";
 import { getBookName } from "@/services/bible";
@@ -26,6 +26,35 @@ export default function PlanDetailPage() {
   const [activeTab, setActiveTab] = useState<"ot" | "nt">("ot");
   const [selectedBookIndex, setSelectedBookIndex] = useState<number | null>(null);
   const [localStatus, setLocalStatus] = useState<number[]>([]);
+
+  useHeader(
+    () => ({
+      title: plan ? updatePlanComputedFields(plan).planName : t("mypage.planDetailTitle"),
+      eyebrow: t("common.back"),
+      showBack: true,
+      actions: plan ? (
+        <>
+          <Link href={`/plans/${plan.id}/edit`} className="btn btn-sm btn-primary">
+            <Pencil className="size-4" />
+            {t("mypage.editPlan")}
+          </Link>
+          <button
+            type="button"
+            className="btn btn-sm btn-error"
+            onClick={() => {
+              deletePlan(plan.id);
+              showToast(t("toast.planDeleted"));
+              router.back();
+            }}
+          >
+            <Trash2 className="size-4" />
+            {t("mypage.deletePlan")}
+          </button>
+        </>
+      ) : null,
+    }),
+    [deletePlan, plan, router, showToast, t],
+  );
 
   if (!plan) {
     notFound();
@@ -46,30 +75,6 @@ export default function PlanDetailPage() {
 
   return (
     <div className="min-h-screen bg-base-100">
-      <PageHeader
-        title={currentPlan.planName}
-        actions={
-          <>
-            <Link href={`/plans/${currentPlan.id}/edit`} className="btn btn-sm btn-primary">
-              <Pencil className="size-4" />
-              {t("mypage.editPlan")}
-            </Link>
-            <button
-              type="button"
-              className="btn btn-sm btn-error"
-              onClick={() => {
-                deletePlan(currentPlan.id);
-                showToast(t("toast.planDeleted"));
-                router.back();
-              }}
-            >
-              <Trash2 className="size-4" />
-              {t("mypage.deletePlan")}
-            </button>
-          </>
-        }
-      />
-
       <div className="space-y-3 px-4 py-5">
         <section className="rounded-[1.75rem] border border-base-300 bg-base-100 p-5 shadow-sm">
           <p className="text-sm font-medium text-base-content/50">{t("mypage.planPeriod")}</p>

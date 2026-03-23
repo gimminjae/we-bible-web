@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { PageHeader } from "@/components/ui/page-header";
+import { useHeader } from "@/hooks/use-header";
 import { useToast } from "@/hooks/use-toast";
 import { useAppStore } from "@/store/app-store";
 import { useI18n } from "@/utils/i18n";
@@ -17,26 +17,31 @@ export default function AddPrayerPage() {
   const [target, setTarget] = useState("");
   const [content, setContent] = useState("");
 
+  useHeader(
+    () => ({
+      title: t("prayerDrawer.addTitle"),
+      eyebrow: t("common.back"),
+      showBack: true,
+      actions: (
+        <button
+          type="button"
+          className="btn btn-sm btn-primary"
+          disabled={!content.trim()}
+          onClick={() => {
+            const id = addPrayer({ requester, target, content });
+            showToast(t("toast.prayerAdded"));
+            router.replace(`/prayers/${id}`);
+          }}
+        >
+          {t("prayerDrawer.save")}
+        </button>
+      ),
+    }),
+    [addPrayer, content, requester, router, showToast, t, target],
+  );
+
   return (
     <div className="min-h-screen bg-base-100">
-      <PageHeader
-        title={t("prayerDrawer.addTitle")}
-        actions={
-          <button
-            type="button"
-            className="btn btn-sm btn-primary"
-            disabled={!content.trim()}
-            onClick={() => {
-              const id = addPrayer({ requester, target, content });
-              showToast(t("toast.prayerAdded"));
-              router.replace(`/prayers/${id}`);
-            }}
-          >
-            {t("prayerDrawer.save")}
-          </button>
-        }
-      />
-
       <div className="space-y-4 px-4 py-5">
         <label className="form-control gap-2">
           <span className="label-text font-medium">{t("prayerDrawer.requesterLabel")}</span>

@@ -3,7 +3,7 @@
 import { notFound, useParams, useRouter } from "next/navigation";
 
 import { PlanForm } from "@/components/plans/plan-form";
-import { PageHeader } from "@/components/ui/page-header";
+import { useHeader } from "@/hooks/use-header";
 import { updatePlanComputedFields } from "@/lib/plan";
 import { useToast } from "@/hooks/use-toast";
 import { useAppStore } from "@/store/app-store";
@@ -17,6 +17,15 @@ export default function EditPlanPage() {
   const plan = useAppStore((state) => state.plans.find((item) => item.id === params.id));
   const updatePlanInfo = useAppStore((state) => state.updatePlanInfo);
 
+  useHeader(
+    () => ({
+      title: t("planDrawer.editTitle"),
+      eyebrow: t("common.back"),
+      showBack: true,
+    }),
+    [t],
+  );
+
   if (!plan) {
     notFound();
   }
@@ -25,7 +34,6 @@ export default function EditPlanPage() {
 
   return (
     <div className="min-h-screen bg-base-100">
-      <PageHeader title={t("planDrawer.editTitle")} />
       <div className="px-4 py-5">
         <PlanForm
           initialValues={{

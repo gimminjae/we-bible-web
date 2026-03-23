@@ -4,7 +4,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { notFound, useParams, useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
-import { PageHeader } from "@/components/ui/page-header";
+import { useHeader } from "@/hooks/use-header";
 import { useToast } from "@/hooks/use-toast";
 import { useAppStore } from "@/store/app-store";
 import { useI18n } from "@/utils/i18n";
@@ -33,35 +33,40 @@ export default function EditPrayerPage() {
 
   const canSave = useMemo(() => contents.some((item) => item.content.trim()), [contents]);
 
+  useHeader(
+    () => ({
+      title: t("prayerDrawer.editTitle"),
+      eyebrow: t("common.back"),
+      showBack: true,
+      actions: prayer ? (
+        <button
+          type="button"
+          className="btn btn-sm btn-primary"
+          disabled={!canSave}
+          onClick={() => {
+            updatePrayer(prayer.id, requester, target);
+            deletedIds.forEach((id) => deletePrayerContent(prayer.id, id));
+            contents.forEach((item) => {
+              if (item.id) updatePrayerContent(prayer.id, item.id, item.content);
+              else if (item.content.trim()) addPrayerContent(prayer.id, item.content);
+            });
+            showToast(t("toast.prayerUpdated"));
+            router.back();
+          }}
+        >
+          {t("prayerDrawer.save")}
+        </button>
+      ) : null,
+    }),
+    [addPrayerContent, canSave, contents, deletePrayerContent, deletedIds, prayer, requester, router, showToast, t, target, updatePrayer, updatePrayerContent],
+  );
+
   if (!prayer) {
     notFound();
   }
 
   return (
     <div className="min-h-screen bg-base-100">
-      <PageHeader
-        title={t("prayerDrawer.editTitle")}
-        actions={
-          <button
-            type="button"
-            className="btn btn-sm btn-primary"
-            disabled={!canSave}
-            onClick={() => {
-              updatePrayer(prayer.id, requester, target);
-              deletedIds.forEach((id) => deletePrayerContent(prayer.id, id));
-              contents.forEach((item) => {
-                if (item.id) updatePrayerContent(prayer.id, item.id, item.content);
-                else if (item.content.trim()) addPrayerContent(prayer.id, item.content);
-              });
-              showToast(t("toast.prayerUpdated"));
-              router.back();
-            }}
-          >
-            {t("prayerDrawer.save")}
-          </button>
-        }
-      />
-
       <div className="space-y-4 px-4 py-5">
         <label className="form-control gap-2">
           <span className="label-text font-medium">{t("prayerDrawer.requesterLabel")}</span>

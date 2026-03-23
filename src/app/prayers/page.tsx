@@ -3,7 +3,7 @@
 import { Plus } from "lucide-react";
 import Link from "next/link";
 
-import { PageHeader } from "@/components/ui/page-header";
+import { useHeader } from "@/hooks/use-header";
 import { useI18n } from "@/utils/i18n";
 import { useAppStore } from "@/store/app-store";
 import { formatShortDateTime } from "@/lib/date";
@@ -30,18 +30,23 @@ export default function PrayersPage() {
   const { t } = useI18n();
   const prayers = useAppStore((state) => state.prayers);
 
+  useHeader(
+    () => ({
+      title: t("mypage.prayersTitle"),
+      eyebrow: t("common.back"),
+      showBack: true,
+      actions: (
+        <Link href="/prayers/add" className="btn btn-sm btn-primary">
+          <Plus className="size-4" />
+          {t("mypage.addPrayer")}
+        </Link>
+      ),
+    }),
+    [t],
+  );
+
   return (
     <div className="min-h-screen bg-base-100">
-      <PageHeader
-        title={t("mypage.prayersTitle")}
-        actions={
-          <Link href="/prayers/add" className="btn btn-sm btn-primary">
-            <Plus className="size-4" />
-            {t("mypage.addPrayer")}
-          </Link>
-        }
-      />
-
       <div className="space-y-3 px-4 py-5">
         {prayers.length === 0 ? (
           <div className="rounded-[1.75rem] border border-dashed border-base-300 bg-base-100 px-5 py-10 text-center text-sm text-base-content/55">

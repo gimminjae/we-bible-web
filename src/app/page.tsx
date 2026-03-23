@@ -7,6 +7,7 @@ import { MemoSheet } from "@/components/memos/memo-sheet";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { useAppSettings } from "@/contexts/app-settings";
 import { useBibleQuery } from "@/hooks/use-bible-query";
+import { useHeader } from "@/hooks/use-header";
 import { useToast } from "@/hooks/use-toast";
 import { copyText } from "@/lib/clipboard";
 import { BIBLE_BOOKS } from "@/lib/plan";
@@ -89,6 +90,45 @@ export default function BibleReaderPage() {
   const langLabel = versions.find((item) => item.val === bible.primaryLang)?.txt ?? bible.primaryLang;
   const allSelectedAreFavorites =
     selectedVerses.length > 0 && selectedVerses.every((verse) => favoriteVerseNumbers.includes(verse));
+
+  useHeader(
+    () => ({
+      content: (
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-1 items-center gap-2 overflow-x-auto">
+            <button
+              type="button"
+              className="btn btn-sm btn-primary rounded-2xl"
+              onClick={() => {
+                setBookPickerStep("book");
+                setBookPickerCategory("ot");
+                setPickerBookCode(bible.bookCode);
+                setBookPickerOpen(true);
+              }}
+            >
+              {bookName} {bible.chapter}
+            </button>
+            <button
+              type="button"
+              className="btn btn-sm btn-ghost rounded-2xl border border-base-300"
+              onClick={() => setLanguagePickerOpen(true)}
+            >
+              {langLabel}
+            </button>
+          </div>
+
+          <button
+            type="button"
+            className="btn btn-sm btn-ghost btn-circle border border-base-300"
+            onClick={() => setSettingsOpen(true)}
+          >
+            <Type className="size-4" />
+          </button>
+        </div>
+      ),
+    }),
+    [bible.bookCode, bible.chapter, bookName, langLabel],
+  );
 
   const memoInitialContent = useMemo(() => {
     if (!selectedVerses.length) return "";
@@ -217,32 +257,6 @@ export default function BibleReaderPage() {
 
   return (
     <div className="relative min-h-screen bg-base-100">
-      <header className="sticky top-0 z-20 border-b border-base-300 bg-base-100/95 px-4 py-4 backdrop-blur">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex flex-1 items-center gap-2 overflow-x-auto">
-            <button
-              type="button"
-              className="btn btn-sm btn-primary rounded-2xl"
-              onClick={() => {
-                setBookPickerStep("book");
-                setBookPickerCategory("ot");
-                setPickerBookCode(bible.bookCode);
-                setBookPickerOpen(true);
-              }}
-            >
-              {bookName} {bible.chapter}
-            </button>
-            <button type="button" className="btn btn-sm btn-ghost rounded-2xl border border-base-300" onClick={() => setLanguagePickerOpen(true)}>
-              {langLabel}
-            </button>
-          </div>
-
-          <button type="button" className="btn btn-sm btn-ghost btn-circle border border-base-300" onClick={() => setSettingsOpen(true)}>
-            <Type className="size-4" />
-          </button>
-        </div>
-      </header>
-
       <div className="px-4 pb-28 pt-5">
         {isLoading ? (
           <div className="flex min-h-[40vh] items-center justify-center">

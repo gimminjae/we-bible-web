@@ -4,6 +4,7 @@ import { BookHeart, BookOpenCheck, ChevronRight, NotebookText, Sparkles } from "
 import Link from "next/link";
 
 import { BibleGrass } from "@/components/mypage/bible-grass";
+import { useHeader } from "@/hooks/use-header";
 import { useI18n } from "@/utils/i18n";
 
 function MenuCard({
@@ -29,20 +30,26 @@ function MenuCard({
 export default function MyPageScreen() {
   const { t } = useI18n();
 
+  useHeader(
+    () => ({
+      title: t("mypage.title"),
+      eyebrow: "Dashboard",
+      size: "hero",
+    }),
+    [t],
+  );
+
   return (
-    <div className="space-y-5 px-4 py-6">
-      <div className="space-y-1">
-        <p className="text-xs uppercase tracking-[0.28em] text-base-content/45">Dashboard</p>
-        <h1 className="text-3xl font-semibold">{t("mypage.title")}</h1>
-      </div>
+    <div className="pb-6">
+      <div className="space-y-5 px-4 py-5">
+        <BibleGrass />
 
-      <BibleGrass />
-
-      <div className="grid gap-3">
-        <MenuCard href="/favorites" title={t("mypage.favoritesMenu")} icon={<BookHeart className="size-5 text-pink-500" />} />
-        <MenuCard href="/memos" title={t("mypage.memosMenu")} icon={<NotebookText className="size-5 text-amber-600" />} />
-        <MenuCard href="/prayers" title={t("mypage.prayersMenu")} icon={<Sparkles className="size-5 text-indigo-500" />} />
-        <MenuCard href="/plans" title={t("mypage.plansMenu")} icon={<BookOpenCheck className="size-5 text-emerald-600" />} />
+        <div className="grid gap-3">
+          <MenuCard href="/favorites" title={t("mypage.favoritesMenu")} icon={<BookHeart className="size-5 text-pink-500" />} />
+          <MenuCard href="/memos" title={t("mypage.memosMenu")} icon={<NotebookText className="size-5 text-amber-600" />} />
+          <MenuCard href="/prayers" title={t("mypage.prayersMenu")} icon={<Sparkles className="size-5 text-indigo-500" />} />
+          <MenuCard href="/plans" title={t("mypage.plansMenu")} icon={<BookOpenCheck className="size-5 text-emerald-600" />} />
+        </div>
       </div>
     </div>
   );

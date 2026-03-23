@@ -7,6 +7,7 @@ import { useShallow } from "zustand/react/shallow";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { useAppSettings } from "@/contexts/app-settings";
 import { buildBackupPayload, downloadBackup, readBackupFile } from "@/lib/backup";
+import { useHeader } from "@/hooks/use-header";
 import { useToast } from "@/hooks/use-toast";
 import { initialPersistedState, useAppStore, type PersistedState } from "@/store/app-store";
 import { useI18n } from "@/utils/i18n";
@@ -40,6 +41,15 @@ export default function SettingsPage() {
   const [guideOpen, setGuideOpen] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
 
+  useHeader(
+    () => ({
+      title: t("settings.title"),
+      eyebrow: "Preferences",
+      size: "hero",
+    }),
+    [t],
+  );
+
   const handleExport = () => {
     downloadBackup(buildBackupPayload(storeState as PersistedState).data);
     showToast(t("settings.exportSuccess"));
@@ -65,11 +75,8 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="space-y-5 px-4 py-6">
-      <div className="space-y-1">
-        <p className="text-xs uppercase tracking-[0.28em] text-base-content/45">Preferences</p>
-        <h1 className="text-3xl font-semibold">{t("settings.title")}</h1>
-      </div>
+    <div className="pb-6">
+      <div className="space-y-5 px-4 py-5">
 
       <section className="space-y-4 rounded-[1.75rem] border border-base-300 bg-base-100 p-5 shadow-sm">
         <div>
@@ -117,6 +124,8 @@ export default function SettingsPage() {
 
         <input ref={fileInputRef} type="file" accept="application/json" className="hidden" onChange={(event) => void handleImport(event)} />
       </section>
+
+      </div>
 
       <BottomSheet open={languagePickerOpen} onClose={() => setLanguagePickerOpen(false)} title={t("settings.languageSelect")}>
         <div className="grid gap-2 pb-4">

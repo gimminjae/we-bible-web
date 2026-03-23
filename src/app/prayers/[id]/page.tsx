@@ -4,7 +4,7 @@ import { Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { notFound, useParams, useRouter } from "next/navigation";
 
-import { PageHeader } from "@/components/ui/page-header";
+import { useHeader } from "@/hooks/use-header";
 import { useToast } from "@/hooks/use-toast";
 import { formatShortDateTime } from "@/lib/date";
 import { useAppStore } from "@/store/app-store";
@@ -19,36 +19,41 @@ export default function PrayerDetailPage() {
   const deletePrayer = useAppStore((state) => state.deletePrayer);
   const deletePrayerContent = useAppStore((state) => state.deletePrayerContent);
 
+  useHeader(
+    () => ({
+      title: t("mypage.prayerDetailTitle"),
+      eyebrow: t("common.back"),
+      showBack: true,
+      actions: prayer ? (
+        <>
+          <Link href={`/prayers/${prayer.id}/edit`} className="btn btn-sm btn-primary">
+            <Pencil className="size-4" />
+            {t("mypage.editPrayer")}
+          </Link>
+          <button
+            type="button"
+            className="btn btn-sm btn-error"
+            onClick={() => {
+              deletePrayer(prayer.id);
+              showToast(t("toast.prayerDeleted"));
+              router.back();
+            }}
+          >
+            <Trash2 className="size-4" />
+            {t("mypage.deletePrayer")}
+          </button>
+        </>
+      ) : null,
+    }),
+    [deletePrayer, prayer, router, showToast, t],
+  );
+
   if (!prayer) {
     notFound();
   }
 
   return (
     <div className="min-h-screen bg-base-100">
-      <PageHeader
-        title={t("mypage.prayerDetailTitle")}
-        actions={
-          <>
-            <Link href={`/prayers/${prayer.id}/edit`} className="btn btn-sm btn-primary">
-              <Pencil className="size-4" />
-              {t("mypage.editPrayer")}
-            </Link>
-            <button
-              type="button"
-              className="btn btn-sm btn-error"
-              onClick={() => {
-                deletePrayer(prayer.id);
-                showToast(t("toast.prayerDeleted"));
-                router.back();
-              }}
-            >
-              <Trash2 className="size-4" />
-              {t("mypage.deletePrayer")}
-            </button>
-          </>
-        }
-      />
-
       <div className="space-y-3 px-4 py-5">
         <section className="rounded-[1.75rem] border border-base-300 bg-base-100 p-5 shadow-sm">
           <p className="text-sm font-medium text-base-content/50">{t("mypage.prayerRequester")}</p>

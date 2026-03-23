@@ -1,3 +1,5 @@
+import { useMemo } from 'react';
+
 import { useOptionalAppSettings } from '@/contexts/app-settings';
 import type { AppLanguage } from '@/utils/app-settings-storage';
 
@@ -661,8 +663,15 @@ export function t(lang: AppLanguage, key: string): string {
 export function useI18n() {
   const appSettings = useOptionalAppSettings();
   const appLanguage = appSettings?.appLanguage ?? 'ko';
-  return {
-    t: (key: string) => t(appLanguage, key),
-  };
+  const translate = useMemo(() => {
+    return (key: string) => t(appLanguage, key);
+  }, [appLanguage]);
+
+  return useMemo(
+    () => ({
+      t: translate,
+    }),
+    [translate],
+  );
 }
 

@@ -5,7 +5,7 @@ import { notFound, useParams, useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
 import { MemoSheet } from "@/components/memos/memo-sheet";
-import { PageHeader } from "@/components/ui/page-header";
+import { useHeader } from "@/hooks/use-header";
 import { copyText } from "@/lib/clipboard";
 import { formatShortDateTime } from "@/lib/date";
 import { useToast } from "@/hooks/use-toast";
@@ -31,38 +31,52 @@ export default function MemoDetailPage() {
     return buildMemoCopyText(memo.title, memo.verseText, memo.content, t("mypage.untitled"));
   }, [memo, t]);
 
+  useHeader(
+    () => ({
+      title: t("mypage.memoDetailTitle"),
+      eyebrow: t("common.back"),
+      showBack: true,
+      actions: (
+        <>
+          <button
+            type="button"
+            className="btn btn-sm btn-ghost border border-base-300"
+            onClick={async () => {
+              await copyText(copyTextValue);
+              showToast(t("toast.copySuccess"));
+            }}
+          >
+            <Copy className="size-4" />
+          </button>
+          <button type="button" className="btn btn-sm btn-primary" onClick={() => setEditOpen(true)}>
+            <Pencil className="size-4" />
+            {t("mypage.editMemo")}
+          </button>
+          <button
+            type="button"
+            className="btn btn-sm btn-error"
+            onClick={() => {
+              if (!memo) return;
+              deleteMemo(memo.id);
+              showToast(t("toast.memoDeleted"));
+              router.back();
+            }}
+          >
+            <Trash2 className="size-4" />
+            {t("mypage.deleteMemo")}
+          </button>
+        </>
+      ),
+    }),
+    [copyTextValue, deleteMemo, memo, router, showToast, t],
+  );
+
   if (!memo) {
     notFound();
   }
 
   return (
     <div className="min-h-screen bg-base-100">
-      <PageHeader
-        title={t("mypage.memoDetailTitle")}
-        actions={
-          <>
-            <button type="button" className="btn btn-sm btn-ghost border border-base-300" onClick={async () => {
-              await copyText(copyTextValue);
-              showToast(t("toast.copySuccess"));
-            }}>
-              <Copy className="size-4" />
-            </button>
-            <button type="button" className="btn btn-sm btn-primary" onClick={() => setEditOpen(true)}>
-              <Pencil className="size-4" />
-              {t("mypage.editMemo")}
-            </button>
-            <button type="button" className="btn btn-sm btn-error" onClick={() => {
-              deleteMemo(memo.id);
-              showToast(t("toast.memoDeleted"));
-              router.back();
-            }}>
-              <Trash2 className="size-4" />
-              {t("mypage.deleteMemo")}
-            </button>
-          </>
-        }
-      />
-
       <div className="space-y-3 px-4 py-5">
         <section className="rounded-[1.75rem] border border-base-300 bg-base-100 p-5 shadow-sm">
           <h2 className="text-lg font-semibold">{memo.title || t("mypage.untitled")}</h2>

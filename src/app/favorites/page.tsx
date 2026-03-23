@@ -3,11 +3,11 @@
 import { Copy, Heart, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
-import { PageHeader } from "@/components/ui/page-header";
 import { copyText } from "@/lib/clipboard";
 import { formatShortDateTime } from "@/lib/date";
 import { getBookName } from "@/services/bible";
 import { useAppSettings } from "@/contexts/app-settings";
+import { useHeader } from "@/hooks/use-header";
 import { useToast } from "@/hooks/use-toast";
 import { useAppStore } from "@/store/app-store";
 import { useI18n } from "@/utils/i18n";
@@ -21,11 +21,19 @@ export default function FavoritesPage() {
   const goToBookChapter = useAppStore((state) => state.goToBookChapter);
   const removeFavorites = useAppStore((state) => state.removeFavorites);
 
+  useHeader(
+    () => ({
+      title: t("mypage.favoritesTitle"),
+      eyebrow: t("common.back"),
+      showBack: true,
+    }),
+    [t],
+  );
+
   const sortedFavorites = [...favorites].sort((left, right) => right.createdAt.localeCompare(left.createdAt));
 
   return (
     <div className="min-h-screen bg-base-100">
-      <PageHeader title={t("mypage.favoritesTitle")} />
       <div className="space-y-3 px-4 py-5">
         {sortedFavorites.length === 0 ? (
           <div className="rounded-[1.75rem] border border-dashed border-base-300 bg-base-100 px-5 py-10 text-center text-sm text-base-content/55">

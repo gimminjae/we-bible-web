@@ -5,6 +5,7 @@ import { useEffect, useState, type ReactNode } from "react";
 
 import { ToastViewport } from "@/components/ui/toast-viewport";
 import { AppSettingsProvider } from "@/contexts/app-settings";
+import { HeaderProvider } from "@/contexts/header-context";
 import { useAppStore } from "@/store/app-store";
 
 function StoreHydrator() {
@@ -35,9 +36,11 @@ export function Providers({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <AppSettingsProvider>
-        <StoreHydrator />
-        {children}
-        <ToastViewport />
+        <HeaderProvider>
+          <StoreHydrator />
+          {children}
+          <ToastViewport />
+        </HeaderProvider>
       </AppSettingsProvider>
     </QueryClientProvider>
   );

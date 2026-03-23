@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { MemoSheet } from "@/components/memos/memo-sheet";
-import { PageHeader } from "@/components/ui/page-header";
+import { useHeader } from "@/hooks/use-header";
 import { copyText } from "@/lib/clipboard";
 import { formatShortDateTime } from "@/lib/date";
 import { useToast } from "@/hooks/use-toast";
@@ -23,18 +23,23 @@ export default function MemosPage() {
   const addMemo = useAppStore((state) => state.addMemo);
   const [memoOpen, setMemoOpen] = useState(false);
 
+  useHeader(
+    () => ({
+      title: t("mypage.memosTitle"),
+      eyebrow: t("common.back"),
+      showBack: true,
+      actions: (
+        <button type="button" className="btn btn-sm btn-primary" onClick={() => setMemoOpen(true)}>
+          <Plus className="size-4" />
+          {t("mypage.writeMemo")}
+        </button>
+      ),
+    }),
+    [t],
+  );
+
   return (
     <div className="min-h-screen bg-base-100">
-      <PageHeader
-        title={t("mypage.memosTitle")}
-        actions={
-          <button type="button" className="btn btn-sm btn-primary" onClick={() => setMemoOpen(true)}>
-            <Plus className="size-4" />
-            {t("mypage.writeMemo")}
-          </button>
-        }
-      />
-
       <div className="space-y-3 px-4 py-5">
         {memos.length === 0 ? (
           <div className="rounded-[1.75rem] border border-dashed border-base-300 bg-base-100 px-5 py-10 text-center text-sm text-base-content/55">

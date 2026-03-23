@@ -3,7 +3,7 @@
 import { Plus } from "lucide-react";
 import Link from "next/link";
 
-import { PageHeader } from "@/components/ui/page-header";
+import { useHeader } from "@/hooks/use-header";
 import { formatShortDate } from "@/lib/date";
 import { getPlanGoalSummary, updatePlanComputedFields } from "@/lib/plan";
 import { useI18n } from "@/utils/i18n";
@@ -13,18 +13,23 @@ export default function PlansPage() {
   const { t } = useI18n();
   const plans = useAppStore((state) => state.plans).map((plan) => updatePlanComputedFields(plan));
 
+  useHeader(
+    () => ({
+      title: t("mypage.plansTitle"),
+      eyebrow: t("common.back"),
+      showBack: true,
+      actions: (
+        <Link href="/plans/add" className="btn btn-sm btn-primary">
+          <Plus className="size-4" />
+          {t("mypage.addPlan")}
+        </Link>
+      ),
+    }),
+    [t],
+  );
+
   return (
     <div className="min-h-screen bg-base-100">
-      <PageHeader
-        title={t("mypage.plansTitle")}
-        actions={
-          <Link href="/plans/add" className="btn btn-sm btn-primary">
-            <Plus className="size-4" />
-            {t("mypage.addPlan")}
-          </Link>
-        }
-      />
-
       <div className="space-y-3 px-4 py-5">
         {plans.length === 0 ? (
           <div className="rounded-[1.75rem] border border-dashed border-base-300 bg-base-100 px-5 py-10 text-center text-sm text-base-content/55">
