@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import { ChevronDown, ChevronLeft, ChevronRight, Heart, HeartOff, NotebookPen, Type } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { MemoSheet } from "@/components/memos/memo-sheet";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
@@ -91,6 +91,16 @@ export default function BibleReaderPage() {
   const langLabel = versions.find((item) => item.val === bible.primaryLang)?.txt ?? bible.primaryLang;
   const allSelectedAreFavorites =
     selectedVerses.length > 0 && selectedVerses.every((verse) => favoriteVerseNumbers.includes(verse));
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, left: 0 });
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+    };
+  }, [bible.bookCode, bible.chapter]);
 
   useHeader(
     () => ({
