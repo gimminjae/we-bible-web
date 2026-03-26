@@ -47,6 +47,10 @@ const messages = {
       signUpFailed: '회원가입 실패',
       googleLoginFailed: 'Google 로그인 실패',
       kakaoLoginFailed: '카카오 로그인 실패',
+      socialLoginFailed: '소셜 로그인 처리 실패',
+      socialAccountConnected: '소셜 계정으로 로그인됨',
+      googleAccountConnected: 'Google 계정으로 로그인됨',
+      kakaoAccountConnected: '카카오 계정으로 로그인됨',
       logoutFailed: '로그아웃 실패',
       logoutConfirmTitle: '로그아웃',
       logoutConfirmMessage: '앱 내의 데이터가 더 이상 동기화되지 않습니다.\n로그아웃 하시겠습니까?',
@@ -367,6 +371,10 @@ const messages = {
       signUpFailed: 'Sign up failed',
       googleLoginFailed: 'Google sign-in failed',
       kakaoLoginFailed: 'Kakao sign-in failed',
+      socialLoginFailed: 'Social sign-in failed',
+      socialAccountConnected: 'Signed in with a social account',
+      googleAccountConnected: 'Signed in with Google',
+      kakaoAccountConnected: 'Signed in with Kakao',
       logoutFailed: 'Logout failed',
       logoutConfirmTitle: 'Log out',
       logoutConfirmMessage:
@@ -674,4 +682,3 @@ export function useI18n() {
     [translate],
   );
 }
-

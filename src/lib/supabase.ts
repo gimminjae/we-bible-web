@@ -1,25 +1,10 @@
-export type SupabaseSession = {
-  access_token: string;
-  refresh_token: string | null;
-  expires_at: number | null;
-  token_type: string;
-};
+import type { User } from "@supabase/supabase-js";
 
-export type SupabaseUser = {
-  email?: string;
-};
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.EXPO_PUBLIC_SUPABASE_URL ?? null;
+const supabasePublishableKey =
+  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? null;
 
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
-const supabasePublishableKey = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-const sessionStorageKey = "supabase.auth.session";
-
-function buildHeaders(accessToken?: string) {
-  return {
-    "Content-Type": "application/json",
-    apikey: supabasePublishableKey ?? "",
-    ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-  };
-}
+export type SocialProvider = "google" | "kakao";
 
 export function isSupabaseConfigured() {
   return Boolean(supabaseUrl && supabasePublishableKey);
@@ -32,97 +17,44 @@ export function getSupabaseConfig() {
   };
 }
 
-export function getStoredSession() {
-  if (typeof window === "undefined") return null;
-  const raw = window.localStorage.getItem(sessionStorageKey);
-  if (!raw) return null;
-
-  try {
-    return JSON.parse(raw) as SupabaseSession;
-  } catch {
-    window.localStorage.removeItem(sessionStorageKey);
-    return null;
+export function requireSupabaseConfig() {
+  if (!supabaseUrl || !supabasePublishableKey) {
+    throw new Error("SUPABASE_NOT_CONFIGURED");
   }
-}
 
-export function setStoredSession(session: SupabaseSession) {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(sessionStorageKey, JSON.stringify(session));
-}
-
-export function clearStoredSession() {
-  if (typeof window === "undefined") return;
-  window.localStorage.removeItem(sessionStorageKey);
-}
-
-export async function signInWithEmail(email: string, password: string) {
-  const response = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=password`, {
-    method: "POST",
-    headers: buildHeaders(),
-    body: JSON.stringify({ email, password }),
-  });
-
-  if (!response.ok) throw new Error("LOGIN_FAILED");
-  return response.json();
-}
-
-export async function signUpWithEmail(email: string, password: string) {
-  const response = await fetch(`${supabaseUrl}/auth/v1/signup`, {
-    method: "POST",
-    headers: buildHeaders(),
-    body: JSON.stringify({ email, password }),
-  });
-
-  if (!response.ok) throw new Error("SIGNUP_FAILED");
-  return response.json();
-}
-
-export async function getUser(accessToken: string) {
-  const response = await fetch(`${supabaseUrl}/auth/v1/user`, {
-    method: "GET",
-    headers: buildHeaders(accessToken),
-  });
-
-  if (!response.ok) throw new Error("GET_USER_FAILED");
-  return (await response.json()) as SupabaseUser;
-}
-
-export async function signOut(accessToken: string) {
-  const response = await fetch(`${supabaseUrl}/auth/v1/logout`, {
-    method: "POST",
-    headers: buildHeaders(accessToken),
-  });
-
-  if (!response.ok) throw new Error("LOGOUT_FAILED");
-}
-
-export function getOAuthLoginUrl(provider: "google" | "kakao", redirectTo: string) {
-  const params = new URLSearchParams({
-    provider,
-    redirect_to: redirectTo,
-    response_type: "token",
-  });
-
-  return `${supabaseUrl}/auth/v1/authorize?${params.toString()}`;
-}
-
-export function readSessionFromAuthCallback() {
-  if (typeof window === "undefined") return null;
-  const hash = window.location.hash.startsWith("#") ? window.location.hash.slice(1) : "";
-  if (!hash) return null;
-
-  const params = new URLSearchParams(hash);
-  const accessToken = params.get("access_token");
-  if (!accessToken) return null;
-
-  const expiresIn = Number(params.get("expires_in") ?? "0");
-  const session: SupabaseSession = {
-    access_token: accessToken,
-    refresh_token: params.get("refresh_token"),
-    token_type: params.get("token_type") ?? "bearer",
-    expires_at: expiresIn > 0 ? Math.floor(Date.now() / 1000) + expiresIn : null,
+  return {
+    supabaseUrl,
+    supabasePublishableKey,
   };
+}
 
-  window.history.replaceState(null, "", window.location.pathname + window.location.search);
-  return session;
+export function getOAuthRedirectTo(origin: string, next = "/settings") {
+  const redirectUrl = new URL("/auth/callback", origin);
+  redirectUrl.searchParams.set("next", next.startsWith("/") ? next : "/settings");
+  return redirectUrl.toString();
+}
+
+export function getUserProvider(user: User | null) {
+  const provider = user?.app_metadata?.provider;
+  return typeof provider === "string" ? provider : null;
+}
+
+export function getUserDisplayName(user: User | null) {
+  if (!user) return null;
+
+  const metadata = user.user_metadata;
+  const candidates = [
+    metadata?.full_name,
+    metadata?.name,
+    metadata?.nickname,
+    metadata?.preferred_username,
+  ];
+
+  const displayName = candidates.find((value): value is string => typeof value === "string" && value.trim().length > 0);
+  return displayName?.trim() ?? null;
+}
+
+export function getUserAccountLabel(user: User | null) {
+  if (!user) return null;
+  return user.email ?? getUserDisplayName(user) ?? null;
 }

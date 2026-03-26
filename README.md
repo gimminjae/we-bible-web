@@ -24,12 +24,28 @@ This project uses [`next/font`](https://nextjs.org/docs/app/building-your-applic
 
 ## Environment Variables
 
-Create a `.env` file in the project root and set:
+Create a `.env.local` file in the project root and set:
 
 ```bash
-EXPO_PUBLIC_SUPABASE_URL=your-supabase-project-url
-EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-supabase-anon-key
+NEXT_PUBLIC_SUPABASE_URL=your-supabase-project-url
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-supabase-publishable-key
 ```
+
+Legacy `EXPO_PUBLIC_*` variable names are still supported in this project.
+
+## Supabase OAuth Setup
+
+For Google and Kakao social login to work, you need both of these configured:
+
+- In Supabase Authentication > URL Configuration, add your app callback URL to the Redirect URLs allow list.
+  - Local: `http://localhost:3000/auth/callback`
+  - Production: `https://your-domain.com/auth/callback`
+- In each provider console, use the provider callback URL that Supabase shows for that provider.
+  - Format: `https://<project-ref>.supabase.co/auth/v1/callback`
+
+Kakao-specific note:
+
+- If your Kakao app does not request `account_email`, enable `Allow users without an email` in the Supabase Kakao provider settings.
 
 ## Learn More
 

@@ -1,24 +1,22 @@
 "use client";
 
+import type { User } from "@supabase/supabase-js";
 import { ChevronDown, Loader2, LogOut, Moon, Sun } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { useAppSettings } from "@/contexts/app-settings";
 import { useDrawer } from "@/hooks/use-drawer";
 import { useHeader } from "@/hooks/use-header";
 import {
-  clearStoredSession,
-  getOAuthLoginUrl,
-  getStoredSession,
-  getUser,
+  getOAuthRedirectTo,
+  getUserAccountLabel,
+  getUserProvider,
   isSupabaseConfigured,
-  readSessionFromAuthCallback,
-  setStoredSession,
-  signInWithEmail,
-  signOut,
-  signUpWithEmail,
+  type SocialProvider,
 } from "@/lib/supabase";
+import { createBrowserSupabaseClient } from "@/lib/supabase-browser";
 import { useToast } from "@/hooks/use-toast";
 import { useI18n } from "@/utils/i18n";
 
@@ -40,6 +38,8 @@ export default function SettingsPage() {
   const { t } = useI18n();
   const { showToast } = useToast();
   const languagePickerDrawer = useDrawer();
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [isLoadingSession, setIsLoadingSession] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -47,8 +47,7 @@ export default function SettingsPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [userEmail, setUserEmail] = useState<string | null>(null);
-
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
 
   useHeader(
     () => ({
@@ -60,40 +59,54 @@ export default function SettingsPage() {
   );
 
   useEffect(() => {
+    const authError = searchParams.get("auth_error");
+    if (!authError) return;
+
+    showToast(t("settings.socialLoginFailed"));
+
+    const nextParams = new URLSearchParams(searchParams.toString());
+    nextParams.delete("auth_error");
+    const nextQuery = nextParams.toString();
+
+    router.replace(nextQuery ? `/settings?${nextQuery}` : "/settings", { scroll: false });
+  }, [router, searchParams, showToast, t]);
+
+  useEffect(() => {
     if (!isSupabaseConfigured()) {
       setIsLoadingSession(false);
       return;
     }
 
-    const callbackSession = readSessionFromAuthCallback();
-    if (callbackSession) {
-      setStoredSession(callbackSession);
-    }
+    const supabase = createBrowserSupabaseClient();
+    let isMounted = true;
 
     const loadUser = async () => {
-      const session = getStoredSession();
-      if (!session?.access_token) {
-        setUserEmail(null);
-        setIsLoadingSession(false);
-        return;
-      }
+      const { data, error } = await supabase.auth.getUser();
+      if (!isMounted) return;
 
-      try {
-        const user = await getUser(session.access_token);
-        setUserEmail(user.email ?? null);
-      } catch {
-        clearStoredSession();
-        setUserEmail(null);
-      } finally {
-        setIsLoadingSession(false);
-      }
+      setCurrentUser(error ? null : data.user);
+      setIsLoadingSession(false);
     };
 
     void loadUser();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!isMounted) return;
+      setCurrentUser(session?.user ?? null);
+      setIsLoadingSession(false);
+    });
+
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const handleEmailAuth = async () => {
     if (!isSupabaseConfigured()) return;
+    const supabase = createBrowserSupabaseClient();
 
     if (!email.trim()) {
       showToast(t("settings.requiredEmail"));
@@ -130,19 +143,26 @@ export default function SettingsPage() {
     setIsSubmitting(true);
     try {
       if (isSignUpMode) {
-        await signUpWithEmail(email.trim(), password);
-        showToast(t("settings.emailVerifyHint"));
-      } else {
-        const sessionPayload = await signInWithEmail(email.trim(), password);
-        setStoredSession({
-          access_token: sessionPayload.access_token,
-          refresh_token: sessionPayload.refresh_token ?? null,
-          token_type: sessionPayload.token_type ?? "bearer",
-          expires_at: sessionPayload.expires_in ? Math.floor(Date.now() / 1000) + Number(sessionPayload.expires_in) : null,
+        const { data, error } = await supabase.auth.signUp({
+          email: email.trim(),
+          password,
         });
 
-        const user = await getUser(sessionPayload.access_token);
-        setUserEmail(user.email ?? email.trim());
+        if (error) throw error;
+
+        if (data.session?.user) {
+          setCurrentUser(data.session.user);
+        } else {
+          showToast(t("settings.emailVerifyHint"));
+        }
+      } else {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: email.trim(),
+          password,
+        });
+
+        if (error) throw error;
+        setCurrentUser(data.user);
       }
     } catch {
       showToast(isSignUpMode ? t("settings.signUpFailed") : t("settings.loginFailed"));
@@ -151,12 +171,21 @@ export default function SettingsPage() {
     }
   };
 
-  const handleSocialLogin = async (provider: "google" | "kakao") => {
+  const handleSocialLogin = async (provider: SocialProvider) => {
     if (!isSupabaseConfigured()) return;
+
+    const supabase = createBrowserSupabaseClient();
     setIsSubmitting(true);
+
     try {
-      window.location.href = getOAuthLoginUrl(provider, `${window.location.origin}/settings`);
-      return;
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo: getOAuthRedirectTo(window.location.origin, "/settings"),
+        },
+      });
+
+      if (error) throw error;
     } catch {
       showToast(provider === "google" ? t("settings.googleLoginFailed") : t("settings.kakaoLoginFailed"));
       setIsSubmitting(false);
@@ -165,20 +194,30 @@ export default function SettingsPage() {
 
   const handleLogout = async () => {
     if (!isSupabaseConfigured()) return;
+
+    const supabase = createBrowserSupabaseClient();
     setIsSubmitting(true);
-    const session = getStoredSession();
+
     try {
-      if (session?.access_token) {
-        await signOut(session.access_token);
-      }
-      clearStoredSession();
-      setUserEmail(null);
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      setCurrentUser(null);
     } catch {
       showToast(t("settings.logoutFailed"));
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  const userLabel =
+    getUserAccountLabel(currentUser) ??
+    (getUserProvider(currentUser) === "google"
+      ? t("settings.googleAccountConnected")
+      : getUserProvider(currentUser) === "kakao"
+        ? t("settings.kakaoAccountConnected")
+        : currentUser
+          ? t("settings.socialAccountConnected")
+          : null);
 
   return (
     <div className="pb-6">
@@ -212,14 +251,14 @@ export default function SettingsPage() {
               <p className="mt-1 text-sm text-base-content/60">{t("settings.authNotConfigured")}</p>
             ) : isLoadingSession ? (
               <p className="mt-1 text-sm text-base-content/60">{t("settings.authChecking")}</p>
-            ) : userEmail ? (
-              <p className="mt-1 text-sm text-base-content/60">{userEmail}</p>
+            ) : currentUser ? (
+              <p className="mt-1 text-sm text-base-content/60">{userLabel}</p>
             ) : (
               <p className="mt-1 text-sm text-base-content/60">{t("settings.accountGuestSyncHint")}</p>
             )}
           </div>
 
-          {isSupabaseConfigured() && !isLoadingSession && !userEmail ? (
+          {isSupabaseConfigured() && !isLoadingSession && !currentUser ? (
             <div className="space-y-3">
               <label className="input input-bordered flex items-center gap-2">
                 <span className="text-sm text-base-content/60">{t("settings.email")}</span>
@@ -263,7 +302,7 @@ export default function SettingsPage() {
             </div>
           ) : null}
 
-          {isSupabaseConfigured() && userEmail ? (
+          {isSupabaseConfigured() && currentUser ? (
             <button type="button" className="btn btn-outline w-full" onClick={() => void handleLogout()} disabled={isSubmitting}>
               <LogOut className="size-4" />
               {t("settings.logout")}
