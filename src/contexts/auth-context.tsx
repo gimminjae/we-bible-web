@@ -12,9 +12,9 @@ import {
   type ReactNode,
 } from "react";
 
-import { setActiveUserId } from "@/lib/auth-state";
+import { getActiveUserId, setActiveUserId } from "@/lib/auth-state";
 import { pausePersistedStateSync, resumePersistedStateSync } from "@/lib/persist-sync-control";
-import { bootstrapSupabaseUserData } from "@/lib/supabase-store";
+import { bootstrapSupabaseUserData, clearLoadedPersistedSlices, markPersistedSlicesLoaded } from "@/lib/supabase-store";
 import { createBrowserSupabaseClient } from "@/lib/supabase-browser";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { createInitialPersistedState, pickPersistedState, useAppStore } from "@/store/app-store";
@@ -44,9 +44,15 @@ async function rehydratePersistedStore(): Promise<void> {
   pausePersistedStateSync();
 
   try {
+    clearLoadedPersistedSlices();
     store.setHasHydrated(false);
     store.replacePersistedState(createInitialPersistedState());
     await Promise.resolve(useAppStore.persist.rehydrate());
+
+    const activeUserId = getActiveUserId();
+    if (activeUserId) {
+      markPersistedSlicesLoaded(activeUserId, ["appState"]);
+    }
   } finally {
     resumePersistedStateSync();
   }

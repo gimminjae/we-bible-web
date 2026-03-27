@@ -8,6 +8,7 @@ import { pausePersistedStateSync, resumePersistedStateSync } from "@/lib/persist
 import {
   getMissingPersistedSlices,
   loadPersistedSlicesFromSupabase,
+  markPersistedSlicesLoaded,
   type PersistedSliceKey,
 } from "@/lib/supabase-store";
 import { useAppStore } from "@/store/app-store";
@@ -59,6 +60,7 @@ export function usePersistedDomainLoad(requestedSlices: PersistedSliceKey[]): Pe
         pausePersistedStateSync();
         try {
           useAppStore.setState(patch);
+          markPersistedSlicesLoaded(dataUserId, missingSlices);
         } finally {
           resumePersistedStateSync();
         }

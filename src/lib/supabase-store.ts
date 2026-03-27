@@ -111,6 +111,7 @@ type PersistedSliceSignatureCache = Partial<PersistedSliceSignatures>;
 
 let persistWriteQueue: Promise<void> = Promise.resolve();
 const persistedSliceSignaturesByUser = new Map<string, PersistedSliceSignatureCache>();
+const loadedPersistedSlicesByUser = new Map<string, Set<PersistedSliceKey>>();
 const PERSISTED_SLICE_KEYS: PersistedSliceKey[] = ["appState", "favorites", "memos", "plans", "prayers", "grassData"];
 
 type SupabaseLikeError = {
@@ -370,17 +371,35 @@ function cachePersistedSliceSignatures(
   return nextCache;
 }
 
-function getChangedPersistedSlices(
-  previous: PersistedSliceSignatureCache | null | undefined,
-  next: PersistedSliceSignatures,
-): PersistedSliceKey[] {
-  if (!previous) return [];
-  return PERSISTED_SLICE_KEYS.filter((key) => previous[key] != null && previous[key] !== next[key]);
+export function getMissingPersistedSlices(userId: string, requestedSlices: PersistedSliceKey[]): PersistedSliceKey[] {
+  const loadedSlices = loadedPersistedSlicesByUser.get(userId);
+  return requestedSlices.filter((slice) => !loadedSlices?.has(slice));
 }
 
-export function getMissingPersistedSlices(userId: string, requestedSlices: PersistedSliceKey[]): PersistedSliceKey[] {
-  const cachedSlices = persistedSliceSignaturesByUser.get(userId) ?? {};
-  return requestedSlices.filter((slice) => cachedSlices[slice] == null);
+function getLoadedPersistedSlices(userId: string): PersistedSliceKey[] {
+  return [...(loadedPersistedSlicesByUser.get(userId) ?? new Set<PersistedSliceKey>())];
+}
+
+export function markPersistedSlicesLoaded(userId: string, slices: PersistedSliceKey[]): void {
+  if (!slices.length) return;
+
+  const existing = loadedPersistedSlicesByUser.get(userId) ?? new Set<PersistedSliceKey>();
+  const next = new Set(existing);
+
+  for (const slice of slices) {
+    next.add(slice);
+  }
+
+  loadedPersistedSlicesByUser.set(userId, next);
+}
+
+export function clearLoadedPersistedSlices(userId?: string | null): void {
+  if (!userId) {
+    loadedPersistedSlicesByUser.clear();
+    return;
+  }
+
+  loadedPersistedSlicesByUser.delete(userId);
 }
 
 async function savePersistedSlicesToSupabase(
@@ -654,17 +673,24 @@ export async function savePersistedStateToSupabase(userId: string, state: Persis
 export function queuePersistedStateSave(userId: string, state: PersistedState): Promise<void> {
   const snapshot = pickPersistedState(state);
   const nextSignatures = buildPersistedSliceSignatures(snapshot);
+  const loadedSlices = getLoadedPersistedSlices(userId);
+
+  if (!loadedSlices.length) {
+    return persistWriteQueue;
+  }
 
   persistWriteQueue = persistWriteQueue.catch(() => undefined).then(async () => {
-    const previousSignatures = persistedSliceSignaturesByUser.get(userId);
-    const changedSlices = getChangedPersistedSlices(previousSignatures, nextSignatures);
+    const previousSignatures = persistedSliceSignaturesByUser.get(userId) ?? {};
+    const changedSlices = loadedSlices.filter(
+      (slice) => previousSignatures[slice] == null || previousSignatures[slice] !== nextSignatures[slice],
+    );
 
     if (!changedSlices.length) {
       return;
     }
 
     await savePersistedSlicesToSupabase(userId, snapshot, changedSlices);
-    persistedSliceSignaturesByUser.set(userId, nextSignatures);
+    cachePersistedSliceSignatures(userId, snapshot, changedSlices);
   });
 
   return persistWriteQueue;
