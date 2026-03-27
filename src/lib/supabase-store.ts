@@ -103,12 +103,13 @@ type GrassRow = {
   data: unknown;
 };
 
-type PersistedSliceKey = "appState" | "favorites" | "memos" | "plans" | "prayers" | "grassData";
+export type PersistedSliceKey = "appState" | "favorites" | "memos" | "plans" | "prayers" | "grassData";
 
 type PersistedSliceSignatures = Record<PersistedSliceKey, string>;
+type PersistedSliceSignatureCache = Partial<PersistedSliceSignatures>;
 
 let persistWriteQueue: Promise<void> = Promise.resolve();
-const persistedSliceSignaturesByUser = new Map<string, PersistedSliceSignatures>();
+const persistedSliceSignaturesByUser = new Map<string, PersistedSliceSignatureCache>();
 const PERSISTED_SLICE_KEYS: PersistedSliceKey[] = ["appState", "favorites", "memos", "plans", "prayers", "grassData"];
 
 type SupabaseLikeError = {
@@ -313,18 +314,70 @@ function buildPersistedSliceSignatures(state: PersistedState): PersistedSliceSig
   };
 }
 
-function cachePersistedSliceSignatures(userId: string, state: PersistedState): PersistedSliceSignatures {
+function createInitialSlicePatch(requestedSlices: PersistedSliceKey[]): Partial<PersistedState> {
+  const initial = createInitialPersistedState();
+  const patch: Partial<PersistedState> = {};
+
+  for (const slice of requestedSlices) {
+    switch (slice) {
+      case "appState":
+        patch.theme = initial.theme;
+        patch.appLanguage = initial.appLanguage;
+        patch.bible = initial.bible;
+        patch.grassTheme = initial.grassTheme;
+        patch.stepRewardUsedDate = initial.stepRewardUsedDate;
+        break;
+      case "favorites":
+        patch.favorites = initial.favorites;
+        break;
+      case "memos":
+        patch.memos = initial.memos;
+        break;
+      case "plans":
+        patch.plans = initial.plans;
+        break;
+      case "prayers":
+        patch.prayers = initial.prayers;
+        break;
+      case "grassData":
+        patch.grassData = initial.grassData;
+        break;
+      default:
+        break;
+    }
+  }
+
+  return patch;
+}
+
+function cachePersistedSliceSignatures(
+  userId: string,
+  state: PersistedState,
+  slices: PersistedSliceKey[] = PERSISTED_SLICE_KEYS,
+): PersistedSliceSignatureCache {
   const signatures = buildPersistedSliceSignatures(state);
-  persistedSliceSignaturesByUser.set(userId, signatures);
-  return signatures;
+  const existing = persistedSliceSignaturesByUser.get(userId) ?? {};
+  const nextCache: PersistedSliceSignatureCache = { ...existing };
+
+  for (const slice of slices) {
+    nextCache[slice] = signatures[slice];
+  }
+
+  persistedSliceSignaturesByUser.set(userId, nextCache);
+  return nextCache;
 }
 
 function getChangedPersistedSlices(
-  previous: PersistedSliceSignatures | null | undefined,
+  previous: PersistedSliceSignatureCache | null | undefined,
   next: PersistedSliceSignatures,
 ): PersistedSliceKey[] {
   if (!previous) return [...PERSISTED_SLICE_KEYS];
-  return PERSISTED_SLICE_KEYS.filter((key) => previous[key] !== next[key]);
+  return PERSISTED_SLICE_KEYS.filter((key) => previous[key] == null || previous[key] !== next[key]);
+}
+
+export function getMissingPersistedSlices(userId: string, requestedSlices: PersistedSliceKey[]): PersistedSliceKey[] {
+  const cachedSlices = persistedSliceSignaturesByUser.get(userId) ?? {};
+  return requestedSlices.filter((slice) => cachedSlices[slice] == null);
 }
 
 async function savePersistedSlicesToSupabase(
@@ -627,8 +680,23 @@ export function queuePersistedStateSave(userId: string, state: PersistedState): 
   return persistWriteQueue;
 }
 
-export async function loadPersistedStateFromSupabase(userId: string): Promise<PersistedState | null> {
+export async function loadPersistedSlicesFromSupabase(
+  userId: string,
+  requestedSlices: PersistedSliceKey[],
+): Promise<Partial<PersistedState>> {
+  const slices = [...new Set(requestedSlices)];
+  if (!slices.length) return {};
+
+  const needsAppState = slices.includes("appState");
+  const needsFavorites = slices.includes("favorites");
+  const needsMemos = slices.includes("memos");
+  const needsPlans = slices.includes("plans");
+  const needsPrayers = slices.includes("prayers");
+  const needsGrassData = slices.includes("grassData");
+
   const supabase = createBrowserSupabaseClient();
+  const patch = createInitialSlicePatch(slices);
+
   const [
     stateRowsResult,
     favoritesResult,
@@ -638,28 +706,43 @@ export async function loadPersistedStateFromSupabase(userId: string): Promise<Pe
     prayersResult,
     grassResult,
   ] = await Promise.all([
-    supabase.from(USER_BIBLE_STATE_TABLE).select("key, value").eq("user_id", userId),
-    supabase.from(USER_FAVORITES_TABLE).select("book_code, chapter, verse, verse_text, created_at").eq("user_id", userId),
-    supabase
-      .from(USER_MEMOS_TABLE)
-      .select("id, client_id, title, content, verse_text, created_at")
-      .eq("user_id", userId)
-      .order("created_at", { ascending: false })
-      .order("id", { ascending: false }),
-    supabase.from(USER_MEMO_VERSES_TABLE).select("memo_id, book_code, chapter, verse").eq("user_id", userId),
-    supabase
-      .from(USER_PLANS_TABLE)
-      .select(
-        "id, client_id, plan_name, start_date, end_date, total_read_count, current_read_count, goal_percent, read_count_per_day, rest_day, goal_status, selected_book_codes, created_at, updated_at",
-      )
-      .eq("user_id", userId)
-      .order("created_at", { ascending: false })
-      .order("id", { ascending: false }),
-    supabase.from(USER_PRAYERS_TABLE).select("id, client_id, requester, target, created_at").eq("user_id", userId).order("created_at", { ascending: false }).order("id", { ascending: false }),
-    supabase.from(USER_GRASS_TABLE).select("date, data").eq("user_id", userId),
+    needsAppState ? supabase.from(USER_BIBLE_STATE_TABLE).select("key, value").eq("user_id", userId) : Promise.resolve(null),
+    needsFavorites
+      ? supabase.from(USER_FAVORITES_TABLE).select("book_code, chapter, verse, verse_text, created_at").eq("user_id", userId)
+      : Promise.resolve(null),
+    needsMemos
+      ? supabase
+          .from(USER_MEMOS_TABLE)
+          .select("id, client_id, title, content, verse_text, created_at")
+          .eq("user_id", userId)
+          .order("created_at", { ascending: false })
+          .order("id", { ascending: false })
+      : Promise.resolve(null),
+    needsMemos
+      ? supabase.from(USER_MEMO_VERSES_TABLE).select("memo_id, book_code, chapter, verse").eq("user_id", userId)
+      : Promise.resolve(null),
+    needsPlans
+      ? supabase
+          .from(USER_PLANS_TABLE)
+          .select(
+            "id, client_id, plan_name, start_date, end_date, total_read_count, current_read_count, goal_percent, read_count_per_day, rest_day, goal_status, selected_book_codes, created_at, updated_at",
+          )
+          .eq("user_id", userId)
+          .order("created_at", { ascending: false })
+          .order("id", { ascending: false })
+      : Promise.resolve(null),
+    needsPrayers
+      ? supabase
+          .from(USER_PRAYERS_TABLE)
+          .select("id, client_id, requester, target, created_at")
+          .eq("user_id", userId)
+          .order("created_at", { ascending: false })
+          .order("id", { ascending: false })
+      : Promise.resolve(null),
+    needsGrassData ? supabase.from(USER_GRASS_TABLE).select("date, data").eq("user_id", userId) : Promise.resolve(null),
   ]);
 
-  const results = [
+  for (const result of [
     stateRowsResult,
     favoritesResult,
     memosResult,
@@ -667,131 +750,139 @@ export async function loadPersistedStateFromSupabase(userId: string): Promise<Pe
     plansResult,
     prayersResult,
     grassResult,
-  ];
-  for (const result of results) {
-    if (result.error) throwSupabaseError(result.error);
+  ]) {
+    if (result?.error) throwSupabaseError(result.error);
   }
 
-  const stateRows = (stateRowsResult.data ?? []) as StateRow[];
-  const favoritesRows = (favoritesResult.data ?? []) as FavoriteRow[];
-  const memoRows = (memosResult.data ?? []) as MemoRow[];
-  const memoVerseRows = (memoVersesResult.data ?? []) as MemoVerseRow[];
-  const planRows = (plansResult.data ?? []) as PlanRow[];
-  const prayerRows = (prayersResult.data ?? []) as PrayerRow[];
-  const grassRows = (grassResult.data ?? []) as GrassRow[];
-  const prayerIds = [...new Set(prayerRows.map((row) => row.id).filter((value) => Number.isFinite(value)))];
-  let prayerContentRows: PrayerContentRow[] = [];
+  if (needsAppState) {
+    const initial = createInitialPersistedState();
+    const stateRows = ((stateRowsResult?.data ?? []) as StateRow[]).filter((row) => typeof row.key === "string");
+    const stateMap = new Map(stateRows.map((row) => [row.key, row.value]));
 
-  if (prayerIds.length > 0) {
-    const { data, error } = await supabase
-      .from(USER_PRAYER_CONTENTS_TABLE)
-      .select("id, client_id, prayer_id, content, registered_at")
-      .in("prayer_id", prayerIds)
-      .order("registered_at", { ascending: false })
-      .order("id", { ascending: false });
-
-    if (error) throwSupabaseError(error);
-    prayerContentRows = (data ?? []) as PrayerContentRow[];
+    patch.theme = fromRemoteTheme(stateMap.get("appTheme"));
+    patch.appLanguage = isAppLanguage(stateMap.get("appLanguage"))
+      ? (stateMap.get("appLanguage") as PersistedState["appLanguage"])
+      : initial.appLanguage;
+    patch.bible = normalizeBibleState(stateMap.get("bibleSearchInfo"), initial.bible);
+    patch.grassTheme = isGrassTheme(stateMap.get("grassColorTheme"))
+      ? (stateMap.get("grassColorTheme") as GrassColorTheme)
+      : initial.grassTheme;
+    patch.stepRewardUsedDate =
+      typeof stateMap.get("stepRewardUsedDate") === "string"
+        ? (stateMap.get("stepRewardUsedDate") as string)
+        : initial.stepRewardUsedDate;
   }
 
-  const hasRemoteData =
-    stateRows.length > 0 ||
-    favoritesRows.length > 0 ||
-    memoRows.length > 0 ||
-    planRows.length > 0 ||
-    prayerRows.length > 0 ||
-    grassRows.length > 0;
-
-  if (!hasRemoteData) {
-    persistedSliceSignaturesByUser.delete(userId);
-    return null;
-  }
-
-  const state = createInitialPersistedState();
-  const stateMap = new Map(stateRows.map((row) => [row.key, row.value]));
-
-  state.theme = fromRemoteTheme(stateMap.get("appTheme"));
-  if (isAppLanguage(stateMap.get("appLanguage"))) {
-    state.appLanguage = stateMap.get("appLanguage") as PersistedState["appLanguage"];
-  }
-  state.bible = normalizeBibleState(stateMap.get("bibleSearchInfo"), state.bible);
-  if (isGrassTheme(stateMap.get("grassColorTheme"))) {
-    state.grassTheme = stateMap.get("grassColorTheme") as GrassColorTheme;
-  }
-  state.stepRewardUsedDate = typeof stateMap.get("stepRewardUsedDate") === "string" ? (stateMap.get("stepRewardUsedDate") as string) : null;
-
-  state.favorites = favoritesRows.map((row) => ({
-    bookCode: row.book_code,
-    chapter: Math.max(1, Math.floor(toNumber(row.chapter, 1))),
-    verse: Math.max(1, Math.floor(toNumber(row.verse, 1))),
-    verseText: row.verse_text ?? "",
-    createdAt: row.created_at ?? "",
-  }));
-
-  const memoVerseMap = new Map<number, MemoVerseRow[]>();
-  for (const row of memoVerseRows) {
-    const existing = memoVerseMap.get(row.memo_id);
-    if (existing) existing.push(row);
-    else memoVerseMap.set(row.memo_id, [row]);
-  }
-
-  state.memos = memoRows.map((row) => {
-    const memo: MemoRecord = {
-      id: row.client_id?.trim() || String(row.id),
-      title: row.title ?? "",
-      content: row.content ?? "",
+  if (needsFavorites) {
+    const favoritesRows = (favoritesResult?.data ?? []) as FavoriteRow[];
+    patch.favorites = favoritesRows.map((row) => ({
+      bookCode: row.book_code,
+      chapter: Math.max(1, Math.floor(toNumber(row.chapter, 1))),
+      verse: Math.max(1, Math.floor(toNumber(row.verse, 1))),
       verseText: row.verse_text ?? "",
       createdAt: row.created_at ?? "",
-    };
-
-    const verses = [...(memoVerseMap.get(row.id) ?? [])].sort((left, right) => left.verse - right.verse);
-    if (!verses.length) return memo;
-
-    const first = verses[0];
-    const sameLocation = verses.every(
-      (item) => item.book_code === first.book_code && item.chapter === first.chapter,
-    );
-
-    if (!sameLocation) return memo;
-
-    return {
-      ...memo,
-      bookCode: first.book_code,
-      chapter: first.chapter,
-      verseNumbers: verses.map((item) => item.verse),
-    };
-  });
-
-  state.plans = planRows.map((row) => createPlanRecordFromRow(row));
-
-  const prayerContentsMap = new Map<number, PrayerContent[]>();
-  for (const row of prayerContentRows) {
-    const content: PrayerContent = {
-      id: row.client_id?.trim() || String(row.id),
-      content: row.content ?? "",
-      registeredAt: row.registered_at ?? "",
-    };
-    const existing = prayerContentsMap.get(row.prayer_id);
-    if (existing) existing.push(content);
-    else prayerContentsMap.set(row.prayer_id, [content]);
+    }));
   }
 
-  state.prayers = prayerRows.map((row) => ({
-    id: row.client_id?.trim() || String(row.id),
-    requester: row.requester ?? "",
-    target: row.target ?? "",
-    createdAt: row.created_at ?? "",
-    contents: [...(prayerContentsMap.get(row.id) ?? [])].sort((left, right) =>
-      right.registeredAt.localeCompare(left.registeredAt),
-    ),
-  }));
+  if (needsMemos) {
+    const memoRows = (memosResult?.data ?? []) as MemoRow[];
+    const memoVerseRows = (memoVersesResult?.data ?? []) as MemoVerseRow[];
+    const memoVerseMap = new Map<number, MemoVerseRow[]>();
 
-  state.grassData = Object.fromEntries(
-    grassRows.map((row) => [row.date, normalizeGrassDayValue(row.date, row.data)]),
-  );
+    for (const row of memoVerseRows) {
+      const existing = memoVerseMap.get(row.memo_id);
+      if (existing) existing.push(row);
+      else memoVerseMap.set(row.memo_id, [row]);
+    }
 
-  cachePersistedSliceSignatures(userId, state);
-  return state;
+    patch.memos = memoRows.map((row) => {
+      const memo: MemoRecord = {
+        id: row.client_id?.trim() || String(row.id),
+        title: row.title ?? "",
+        content: row.content ?? "",
+        verseText: row.verse_text ?? "",
+        createdAt: row.created_at ?? "",
+      };
+
+      const verses = [...(memoVerseMap.get(row.id) ?? [])].sort((left, right) => left.verse - right.verse);
+      if (!verses.length) return memo;
+
+      const first = verses[0];
+      const sameLocation = verses.every(
+        (item) => item.book_code === first.book_code && item.chapter === first.chapter,
+      );
+
+      if (!sameLocation) return memo;
+
+      return {
+        ...memo,
+        bookCode: first.book_code,
+        chapter: first.chapter,
+        verseNumbers: verses.map((item) => item.verse),
+      };
+    });
+  }
+
+  if (needsPlans) {
+    const planRows = (plansResult?.data ?? []) as PlanRow[];
+    patch.plans = planRows.map((row) => createPlanRecordFromRow(row));
+  }
+
+  if (needsPrayers) {
+    const prayerRows = (prayersResult?.data ?? []) as PrayerRow[];
+    const prayerIds = [...new Set(prayerRows.map((row) => row.id).filter((value) => Number.isFinite(value)))];
+    let prayerContentRows: PrayerContentRow[] = [];
+
+    if (prayerIds.length > 0) {
+      const { data, error } = await supabase
+        .from(USER_PRAYER_CONTENTS_TABLE)
+        .select("id, client_id, prayer_id, content, registered_at")
+        .in("prayer_id", prayerIds)
+        .order("registered_at", { ascending: false })
+        .order("id", { ascending: false });
+
+      if (error) throwSupabaseError(error);
+      prayerContentRows = (data ?? []) as PrayerContentRow[];
+    }
+
+    const prayerContentsMap = new Map<number, PrayerContent[]>();
+    for (const row of prayerContentRows) {
+      const content: PrayerContent = {
+        id: row.client_id?.trim() || String(row.id),
+        content: row.content ?? "",
+        registeredAt: row.registered_at ?? "",
+      };
+      const existing = prayerContentsMap.get(row.prayer_id);
+      if (existing) existing.push(content);
+      else prayerContentsMap.set(row.prayer_id, [content]);
+    }
+
+    patch.prayers = prayerRows.map((row) => ({
+      id: row.client_id?.trim() || String(row.id),
+      requester: row.requester ?? "",
+      target: row.target ?? "",
+      createdAt: row.created_at ?? "",
+      contents: [...(prayerContentsMap.get(row.id) ?? [])].sort((left, right) =>
+        right.registeredAt.localeCompare(left.registeredAt),
+      ),
+    }));
+  }
+
+  if (needsGrassData) {
+    const grassRows = (grassResult?.data ?? []) as GrassRow[];
+    patch.grassData = Object.fromEntries(
+      grassRows.map((row) => [row.date, normalizeGrassDayValue(row.date, row.data)]),
+    );
+  }
+
+  const cacheState = Object.assign(createInitialPersistedState(), patch);
+  cachePersistedSliceSignatures(userId, cacheState, slices);
+
+  return patch;
+}
+
+export async function loadPersistedStateFromSupabase(userId: string): Promise<Partial<PersistedState>> {
+  return loadPersistedSlicesFromSupabase(userId, ["appState"]);
 }
 
 export async function clearLocalPersistedState(): Promise<void> {
