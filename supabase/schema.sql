@@ -1,9 +1,9 @@
 create table if not exists public.bible_state (
-  user_id uuid not null references auth.users (id) on delete cascade,
-  key text not null,
-  value jsonb,
-  updated_at timestamptz not null default timezone('utc', now()),
-  primary key (user_id, key)
+  user_id uuid primary key references auth.users (id) on delete cascade,
+  app_theme text not null default 'light',
+  app_language text not null default 'ko',
+  bible_search_info jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default timezone('utc', now())
 );
 
 create table if not exists public.favorite_verses (

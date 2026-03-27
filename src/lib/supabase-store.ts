@@ -37,9 +37,10 @@ export const USER_GRASS_TABLE = "bible_grass";
 const GRASS_META_ROW_DATE = "__meta__";
 const WEB_SUPABASE_SCHEMA_PATH = "C:\\Users\\minja\\mylists\\we-bible-web\\supabase\\schema.sql";
 
-type StateRow = {
-  key: string;
-  value: unknown;
+type StateRecord = {
+  app_theme: string | null;
+  app_language: string | null;
+  bible_search_info: unknown;
 };
 
 type FavoriteRow = {
@@ -274,21 +275,14 @@ function createPlanRecordFromRow(row: PlanRow): PlanRecord {
   });
 }
 
-function buildStateRows(state: PersistedState) {
-  return [
-    {
-      key: "appTheme",
-      value: toRemoteTheme(state.theme),
-    },
-    {
-      key: "appLanguage",
-      value: state.appLanguage,
-    },
-    {
-      key: "bibleSearchInfo",
-      value: state.bible,
-    },
-  ];
+function buildStateRecord(userId: string, state: PersistedState) {
+  return {
+    user_id: userId,
+    app_theme: toRemoteTheme(state.theme),
+    app_language: state.appLanguage,
+    bible_search_info: state.bible,
+    updated_at: new Date().toISOString(),
+  };
 }
 
 function getAppStateSlice(state: PersistedState) {
@@ -410,7 +404,7 @@ async function savePersistedSlicesToSupabase(
   for (const slice of changedSlices) {
     switch (slice) {
       case "appState":
-        await replaceStateRows(userId, snapshot);
+        await replaceStateRecord(userId, snapshot);
         break;
       case "favorites":
         await replaceFavorites(userId, snapshot.favorites);
@@ -436,7 +430,7 @@ async function savePersistedSlicesToSupabase(
 async function hasRemoteRows(userId: string): Promise<boolean> {
   const supabase = createBrowserSupabaseClient();
   const checks = await Promise.all([
-    supabase.from(USER_BIBLE_STATE_TABLE).select("key").eq("user_id", userId).limit(1),
+    supabase.from(USER_BIBLE_STATE_TABLE).select("user_id").eq("user_id", userId).limit(1),
     supabase.from(USER_FAVORITES_TABLE).select("verse").eq("user_id", userId).limit(1),
     supabase.from(USER_MEMOS_TABLE).select("id").eq("user_id", userId).limit(1),
     supabase.from(USER_PLANS_TABLE).select("id").eq("user_id", userId).limit(1),
@@ -452,20 +446,14 @@ async function hasRemoteRows(userId: string): Promise<boolean> {
   return false;
 }
 
-async function replaceStateRows(userId: string, state: PersistedState): Promise<void> {
+async function replaceStateRecord(userId: string, state: PersistedState): Promise<void> {
   const supabase = createBrowserSupabaseClient();
-  const payload = buildStateRows(state).map((row) => ({
-    user_id: userId,
-    key: row.key,
-    value: row.value,
-  }));
+  const payload = buildStateRecord(userId, state);
 
-  if (payload.length > 0) {
-    const { error } = await supabase.from(USER_BIBLE_STATE_TABLE).upsert(payload, {
-      onConflict: "user_id,key",
-    });
-    if (error) throwSupabaseError(error);
-  }
+  const { error } = await supabase.from(USER_BIBLE_STATE_TABLE).upsert(payload, {
+    onConflict: "user_id",
+  });
+  if (error) throwSupabaseError(error);
 }
 
 async function replaceFavorites(userId: string, favorites: FavoriteVerseRecord[]): Promise<void> {
@@ -722,7 +710,13 @@ export async function loadPersistedSlicesFromSupabase(
     prayersResult,
     grassResult,
   ] = await Promise.all([
-    needsAppState ? supabase.from(USER_BIBLE_STATE_TABLE).select("key, value").eq("user_id", userId) : Promise.resolve(null),
+    needsAppState
+      ? supabase
+          .from(USER_BIBLE_STATE_TABLE)
+          .select("app_theme, app_language, bible_search_info")
+          .eq("user_id", userId)
+          .maybeSingle()
+      : Promise.resolve(null),
     needsFavorites
       ? supabase.from(USER_FAVORITES_TABLE).select("book_code, chapter, verse, verse_text, created_at").eq("user_id", userId)
       : Promise.resolve(null),
@@ -772,20 +766,13 @@ export async function loadPersistedSlicesFromSupabase(
 
   if (needsAppState) {
     const initial = createInitialPersistedState();
-    const stateRows = ((stateRowsResult?.data ?? []) as StateRow[]).filter((row) => typeof row.key === "string");
-    const stateMap = new Map(stateRows.map((row) => [row.key, row.value]));
+    const stateRow = ((stateRowsResult?.data ?? null) as StateRecord | null) ?? null;
 
-    patch.theme = fromRemoteTheme(stateMap.get("appTheme"));
-    patch.appLanguage = isAppLanguage(stateMap.get("appLanguage"))
-      ? (stateMap.get("appLanguage") as PersistedState["appLanguage"])
+    patch.theme = fromRemoteTheme(stateRow?.app_theme);
+    patch.appLanguage = isAppLanguage(stateRow?.app_language)
+      ? (stateRow.app_language as PersistedState["appLanguage"])
       : initial.appLanguage;
-    patch.bible = normalizeBibleState(stateMap.get("bibleSearchInfo"), initial.bible);
-    if (isGrassTheme(stateMap.get("grassColorTheme"))) {
-      patch.grassTheme = stateMap.get("grassColorTheme") as GrassColorTheme;
-    }
-    if (typeof stateMap.get("stepRewardUsedDate") === "string") {
-      patch.stepRewardUsedDate = stateMap.get("stepRewardUsedDate") as string;
-    }
+    patch.bible = normalizeBibleState(stateRow?.bible_search_info, initial.bible);
   }
 
   if (needsFavorites) {
