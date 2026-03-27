@@ -26,14 +26,15 @@ import {
   type PrayerRecord,
 } from "@/store/app-store";
 
-export const USER_BIBLE_STATE_TABLE = "user_bible_state";
-export const USER_FAVORITES_TABLE = "user_favorite_verses";
-export const USER_MEMOS_TABLE = "user_memos";
-export const USER_MEMO_VERSES_TABLE = "user_memo_verses";
-export const USER_PLANS_TABLE = "user_plans";
-export const USER_PRAYERS_TABLE = "user_prayers";
-export const USER_PRAYER_CONTENTS_TABLE = "user_prayer_contents";
-export const USER_GRASS_TABLE = "user_bible_grass";
+export const USER_BIBLE_STATE_TABLE = "bible_state";
+export const USER_FAVORITES_TABLE = "favorite_verses";
+export const USER_MEMOS_TABLE = "memos";
+export const USER_MEMO_VERSES_TABLE = "memo_verses";
+export const USER_PLANS_TABLE = "plans";
+export const USER_PRAYERS_TABLE = "prayers";
+export const USER_PRAYER_CONTENTS_TABLE = "prayer_contents";
+export const USER_GRASS_TABLE = "bible_grass";
+const WEB_SUPABASE_SCHEMA_PATH = "C:\\Users\\minja\\mylists\\we-bible-web\\supabase\\schema.sql";
 
 type StateRow = {
   key: string;
@@ -103,6 +104,46 @@ type GrassRow = {
 };
 
 let persistWriteQueue: Promise<void> = Promise.resolve();
+
+type SupabaseLikeError = {
+  code?: unknown;
+  message?: unknown;
+  details?: unknown;
+  hint?: unknown;
+};
+
+function toErrorMessagePart(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function normalizeSupabaseError(error: unknown): Error {
+  if (error instanceof Error) return error;
+
+  if (error && typeof error === "object") {
+    const candidate = error as SupabaseLikeError;
+    const code = toErrorMessagePart(candidate.code);
+    const message = toErrorMessagePart(candidate.message);
+    const details = toErrorMessagePart(candidate.details);
+    const hint = toErrorMessagePart(candidate.hint);
+
+    if (code === "PGRST205" && message?.includes("Could not find the table")) {
+      return new Error(
+        `Supabase schema is missing required tables. Apply ${WEB_SUPABASE_SCHEMA_PATH}. Original error: ${message}${hint ? ` (${hint})` : ""}`,
+      );
+    }
+
+    const parts = [message, details, hint].filter((value): value is string => Boolean(value));
+    if (parts.length > 0) {
+      return new Error(parts.join(" | "));
+    }
+  }
+
+  return new Error("SUPABASE_DATA_SYNC_FAILED");
+}
+
+function throwSupabaseError(error: unknown): never {
+  throw normalizeSupabaseError(error);
+}
 
 function toNumber(value: unknown, fallback = 0): number {
   const parsed = Number(value);
@@ -276,7 +317,7 @@ async function replaceStateRows(userId: string, state: PersistedState): Promise<
     const { error } = await supabase.from(USER_BIBLE_STATE_TABLE).upsert(payload, {
       onConflict: "user_id,key",
     });
-    if (error) throw error;
+    if (error) throwSupabaseError(error);
   }
 
   if (state.stepRewardUsedDate) {
@@ -290,7 +331,7 @@ async function replaceStateRows(userId: string, state: PersistedState): Promise<
         onConflict: "user_id,key",
       },
     );
-    if (error) throw error;
+    if (error) throwSupabaseError(error);
     return;
   }
 
@@ -300,13 +341,13 @@ async function replaceStateRows(userId: string, state: PersistedState): Promise<
     .eq("user_id", userId)
     .eq("key", "stepRewardUsedDate");
 
-  if (error) throw error;
+  if (error) throwSupabaseError(error);
 }
 
 async function replaceFavorites(userId: string, favorites: FavoriteVerseRecord[]): Promise<void> {
   const supabase = createBrowserSupabaseClient();
   const { error: deleteError } = await supabase.from(USER_FAVORITES_TABLE).delete().eq("user_id", userId);
-  if (deleteError) throw deleteError;
+  if (deleteError) throwSupabaseError(deleteError);
 
   if (!favorites.length) return;
 
@@ -320,17 +361,17 @@ async function replaceFavorites(userId: string, favorites: FavoriteVerseRecord[]
   }));
 
   const { error } = await supabase.from(USER_FAVORITES_TABLE).insert(payload);
-  if (error) throw error;
+  if (error) throwSupabaseError(error);
 }
 
 async function replaceMemos(userId: string, memos: MemoRecord[]): Promise<void> {
   const supabase = createBrowserSupabaseClient();
 
   const { error: deleteMemoVersesError } = await supabase.from(USER_MEMO_VERSES_TABLE).delete().eq("user_id", userId);
-  if (deleteMemoVersesError) throw deleteMemoVersesError;
+  if (deleteMemoVersesError) throwSupabaseError(deleteMemoVersesError);
 
   const { error: deleteMemosError } = await supabase.from(USER_MEMOS_TABLE).delete().eq("user_id", userId);
-  if (deleteMemosError) throw deleteMemosError;
+  if (deleteMemosError) throwSupabaseError(deleteMemosError);
 
   if (!memos.length) return;
 
@@ -350,7 +391,7 @@ async function replaceMemos(userId: string, memos: MemoRecord[]): Promise<void> 
       .select("id")
       .single();
 
-    if (error) throw error;
+    if (error) throwSupabaseError(error);
     memoIdMap.set(memo.id, toNumber(data?.id));
   }
 
@@ -374,13 +415,13 @@ async function replaceMemos(userId: string, memos: MemoRecord[]): Promise<void> 
   if (!versePayload.length) return;
 
   const { error } = await supabase.from(USER_MEMO_VERSES_TABLE).insert(versePayload);
-  if (error) throw error;
+  if (error) throwSupabaseError(error);
 }
 
 async function replacePlans(userId: string, plans: PlanRecord[]): Promise<void> {
   const supabase = createBrowserSupabaseClient();
   const { error: deleteError } = await supabase.from(USER_PLANS_TABLE).delete().eq("user_id", userId);
-  if (deleteError) throw deleteError;
+  if (deleteError) throwSupabaseError(deleteError);
 
   if (!plans.length) return;
 
@@ -402,17 +443,17 @@ async function replacePlans(userId: string, plans: PlanRecord[]): Promise<void> 
   }));
 
   const { error } = await supabase.from(USER_PLANS_TABLE).insert(payload);
-  if (error) throw error;
+  if (error) throwSupabaseError(error);
 }
 
 async function replacePrayers(userId: string, prayers: PrayerRecord[]): Promise<void> {
   const supabase = createBrowserSupabaseClient();
 
   const { error: deleteContentsError } = await supabase.from(USER_PRAYER_CONTENTS_TABLE).delete().eq("user_id", userId);
-  if (deleteContentsError) throw deleteContentsError;
+  if (deleteContentsError) throwSupabaseError(deleteContentsError);
 
   const { error: deletePrayersError } = await supabase.from(USER_PRAYERS_TABLE).delete().eq("user_id", userId);
-  if (deletePrayersError) throw deletePrayersError;
+  if (deletePrayersError) throwSupabaseError(deletePrayersError);
 
   if (!prayers.length) return;
 
@@ -431,7 +472,7 @@ async function replacePrayers(userId: string, prayers: PrayerRecord[]): Promise<
       .select("id")
       .single();
 
-    if (error) throw error;
+    if (error) throwSupabaseError(error);
     prayerIdMap.set(prayer.id, toNumber(data?.id));
   }
 
@@ -451,13 +492,13 @@ async function replacePrayers(userId: string, prayers: PrayerRecord[]): Promise<
   if (!contentsPayload.length) return;
 
   const { error } = await supabase.from(USER_PRAYER_CONTENTS_TABLE).insert(contentsPayload);
-  if (error) throw error;
+  if (error) throwSupabaseError(error);
 }
 
 async function replaceGrass(userId: string, grassData: GrassDataMap): Promise<void> {
   const supabase = createBrowserSupabaseClient();
   const { error: deleteError } = await supabase.from(USER_GRASS_TABLE).delete().eq("user_id", userId);
-  if (deleteError) throw deleteError;
+  if (deleteError) throwSupabaseError(deleteError);
 
   const payload = Object.values(grassData).map((day) => ({
     user_id: userId,
@@ -472,7 +513,7 @@ async function replaceGrass(userId: string, grassData: GrassDataMap): Promise<vo
   if (!payload.length) return;
 
   const { error } = await supabase.from(USER_GRASS_TABLE).insert(payload);
-  if (error) throw error;
+  if (error) throwSupabaseError(error);
 }
 
 export async function savePersistedStateToSupabase(userId: string, state: PersistedState): Promise<void> {
@@ -542,7 +583,7 @@ export async function loadPersistedStateFromSupabase(userId: string): Promise<Pe
     grassResult,
   ];
   for (const result of results) {
-    if (result.error) throw result.error;
+    if (result.error) throwSupabaseError(result.error);
   }
 
   const stateRows = (stateRowsResult.data ?? []) as StateRow[];
