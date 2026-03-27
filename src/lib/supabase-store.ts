@@ -103,7 +103,13 @@ type GrassRow = {
   data: unknown;
 };
 
+type PersistedSliceKey = "appState" | "favorites" | "memos" | "plans" | "prayers" | "grassData";
+
+type PersistedSliceSignatures = Record<PersistedSliceKey, string>;
+
 let persistWriteQueue: Promise<void> = Promise.resolve();
+const persistedSliceSignaturesByUser = new Map<string, PersistedSliceSignatures>();
+const PERSISTED_SLICE_KEYS: PersistedSliceKey[] = ["appState", "favorites", "memos", "plans", "prayers", "grassData"];
 
 type SupabaseLikeError = {
   code?: unknown;
@@ -284,6 +290,72 @@ function buildStateRows(state: PersistedState) {
       value: state.grassTheme,
     },
   ];
+}
+
+function getAppStateSlice(state: PersistedState) {
+  return {
+    theme: state.theme,
+    appLanguage: state.appLanguage,
+    bible: state.bible,
+    grassTheme: state.grassTheme,
+    stepRewardUsedDate: state.stepRewardUsedDate,
+  };
+}
+
+function buildPersistedSliceSignatures(state: PersistedState): PersistedSliceSignatures {
+  return {
+    appState: JSON.stringify(getAppStateSlice(state)),
+    favorites: JSON.stringify(state.favorites),
+    memos: JSON.stringify(state.memos),
+    plans: JSON.stringify(state.plans),
+    prayers: JSON.stringify(state.prayers),
+    grassData: JSON.stringify(state.grassData),
+  };
+}
+
+function cachePersistedSliceSignatures(userId: string, state: PersistedState): PersistedSliceSignatures {
+  const signatures = buildPersistedSliceSignatures(state);
+  persistedSliceSignaturesByUser.set(userId, signatures);
+  return signatures;
+}
+
+function getChangedPersistedSlices(
+  previous: PersistedSliceSignatures | null | undefined,
+  next: PersistedSliceSignatures,
+): PersistedSliceKey[] {
+  if (!previous) return [...PERSISTED_SLICE_KEYS];
+  return PERSISTED_SLICE_KEYS.filter((key) => previous[key] !== next[key]);
+}
+
+async function savePersistedSlicesToSupabase(
+  userId: string,
+  snapshot: PersistedState,
+  changedSlices: PersistedSliceKey[],
+): Promise<void> {
+  for (const slice of changedSlices) {
+    switch (slice) {
+      case "appState":
+        await replaceStateRows(userId, snapshot);
+        break;
+      case "favorites":
+        await replaceFavorites(userId, snapshot.favorites);
+        break;
+      case "memos":
+        await replaceMemos(userId, snapshot.memos);
+        break;
+      case "plans":
+        await replacePlans(userId, snapshot.plans);
+        break;
+      case "prayers":
+        await replacePrayers(userId, snapshot.prayers);
+        break;
+      case "grassData":
+        await replaceGrass(userId, snapshot.grassData);
+        break;
+      default:
+        break;
+    }
+  }
 }
 
 async function hasRemoteRows(userId: string): Promise<boolean> {
@@ -532,18 +604,26 @@ async function replaceGrass(userId: string, grassData: GrassDataMap): Promise<vo
 
 export async function savePersistedStateToSupabase(userId: string, state: PersistedState): Promise<void> {
   const snapshot = pickPersistedState(state);
-
-  await replaceStateRows(userId, snapshot);
-  await replaceFavorites(userId, snapshot.favorites);
-  await replaceMemos(userId, snapshot.memos);
-  await replacePlans(userId, snapshot.plans);
-  await replacePrayers(userId, snapshot.prayers);
-  await replaceGrass(userId, snapshot.grassData);
+  await savePersistedSlicesToSupabase(userId, snapshot, PERSISTED_SLICE_KEYS);
+  cachePersistedSliceSignatures(userId, snapshot);
 }
 
 export function queuePersistedStateSave(userId: string, state: PersistedState): Promise<void> {
   const snapshot = pickPersistedState(state);
-  persistWriteQueue = persistWriteQueue.catch(() => undefined).then(() => savePersistedStateToSupabase(userId, snapshot));
+  const nextSignatures = buildPersistedSliceSignatures(snapshot);
+
+  persistWriteQueue = persistWriteQueue.catch(() => undefined).then(async () => {
+    const previousSignatures = persistedSliceSignaturesByUser.get(userId);
+    const changedSlices = getChangedPersistedSlices(previousSignatures, nextSignatures);
+
+    if (!changedSlices.length) {
+      return;
+    }
+
+    await savePersistedSlicesToSupabase(userId, snapshot, changedSlices);
+    persistedSliceSignaturesByUser.set(userId, nextSignatures);
+  });
+
   return persistWriteQueue;
 }
 
@@ -622,7 +702,10 @@ export async function loadPersistedStateFromSupabase(userId: string): Promise<Pe
     prayerRows.length > 0 ||
     grassRows.length > 0;
 
-  if (!hasRemoteData) return null;
+  if (!hasRemoteData) {
+    persistedSliceSignaturesByUser.delete(userId);
+    return null;
+  }
 
   const state = createInitialPersistedState();
   const stateMap = new Map(stateRows.map((row) => [row.key, row.value]));
@@ -707,6 +790,7 @@ export async function loadPersistedStateFromSupabase(userId: string): Promise<Pe
     grassRows.map((row) => [row.date, normalizeGrassDayValue(row.date, row.data)]),
   );
 
+  cachePersistedSliceSignatures(userId, state);
   return state;
 }
 

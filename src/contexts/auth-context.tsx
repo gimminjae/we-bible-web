@@ -13,6 +13,7 @@ import {
 } from "react";
 
 import { setActiveUserId } from "@/lib/auth-state";
+import { pausePersistedStateSync, resumePersistedStateSync } from "@/lib/persist-sync-control";
 import { bootstrapSupabaseUserData } from "@/lib/supabase-store";
 import { createBrowserSupabaseClient } from "@/lib/supabase-browser";
 import { isSupabaseConfigured } from "@/lib/supabase";
@@ -40,9 +41,16 @@ function getErrorMessage(error: unknown): string {
 
 async function rehydratePersistedStore(): Promise<void> {
   const store = useAppStore.getState();
-  store.setHasHydrated(false);
-  store.replacePersistedState(createInitialPersistedState());
-  await Promise.resolve(useAppStore.persist.rehydrate());
+  pausePersistedStateSync();
+
+  try {
+    store.setHasHydrated(false);
+    store.replacePersistedState(createInitialPersistedState());
+    await Promise.resolve(useAppStore.persist.rehydrate());
+  } finally {
+    resumePersistedStateSync();
+  }
+
   useAppStore.getState().setHasHydrated(true);
 }
 

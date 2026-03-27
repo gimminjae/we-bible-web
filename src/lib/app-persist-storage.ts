@@ -3,6 +3,7 @@
 import type { PersistStorage, StorageValue } from "zustand/middleware";
 
 import { getActiveUserId } from "@/lib/auth-state";
+import { isPersistedStateSyncPaused } from "@/lib/persist-sync-control";
 import { getLocalPersistedItem, removeLocalPersistedItem, setLocalPersistedItem } from "@/lib/storage";
 import { loadPersistedStateFromSupabase, queuePersistedStateSave } from "@/lib/supabase-store";
 import type { PersistedState } from "@/store/app-store";
@@ -24,6 +25,10 @@ export function createAppPersistStorage<T extends PersistedState>(): PersistStor
       };
     },
     setItem: async (name: string, value: StorageValue<T>): Promise<void> => {
+      if (isPersistedStateSyncPaused()) {
+        return;
+      }
+
       const userId = getActiveUserId();
       if (!userId) {
         await setLocalPersistedItem(name, value);
