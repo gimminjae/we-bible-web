@@ -8,9 +8,10 @@ import { getChapterCountForDate, getStreakUpToYesterday, type GrassColorTheme } 
 import { formatShortDate } from "@/lib/date";
 import { getBookName } from "@/services/bible";
 import { useAppSettings } from "@/contexts/app-settings";
+import { useBibleGrass } from "@/hooks/use-bible-grass";
 import { useDrawer } from "@/hooks/use-drawer";
 import { useToast } from "@/hooks/use-toast";
-import { isFreeRewardAvailable, useAppStore } from "@/store/app-store";
+import { isFreeRewardAvailable } from "@/store/app-store";
 import { useI18n } from "@/utils/i18n";
 
 const DAY_LABELS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
@@ -130,12 +131,16 @@ export function BibleGrass() {
   const { appLanguage } = useAppSettings();
   const { t } = useI18n();
   const { showToast } = useToast();
-  const grassData = useAppStore((state) => state.grassData);
-  const grassTheme = useAppStore((state) => state.grassTheme);
-  const setGrassTheme = useAppStore((state) => state.setGrassTheme);
-  const fillPastGrass = useAppStore((state) => state.fillPastGrass);
-  const stepRewardUsedDate = useAppStore((state) => state.stepRewardUsedDate);
-  const markStepRewardUsed = useAppStore((state) => state.markStepRewardUsed);
+  const {
+    grassData,
+    grassTheme,
+    setGrassTheme,
+    fillPastGrass,
+    stepRewardUsedDate,
+    markStepRewardUsed,
+    isLoading,
+    error,
+  } = useBibleGrass();
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const guideDrawer = useDrawer();
@@ -202,6 +207,22 @@ export function BibleGrass() {
   };
 
   const freeReward = isFreeRewardAvailable(stepRewardUsedDate);
+
+  if (error) {
+    return (
+      <section className="rounded-[1.75rem] border border-base-300 bg-base-100 p-5 text-sm text-error shadow-sm">
+        {error}
+      </section>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <section className="rounded-[1.75rem] border border-base-300 bg-base-100 p-5 text-sm text-base-content/55 shadow-sm">
+        Loading grass data...
+      </section>
+    );
+  }
 
   return (
     <section className="rounded-[1.75rem] border border-base-300 bg-base-100 p-5 shadow-sm">

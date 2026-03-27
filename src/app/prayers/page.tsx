@@ -3,9 +3,10 @@
 import { Plus } from "lucide-react";
 import Link from "next/link";
 
+import { LoadingScreen } from "@/components/ui/loading-screen";
 import { useHeader } from "@/hooks/use-header";
+import { usePrayers } from "@/hooks/use-prayers";
 import { useI18n } from "@/utils/i18n";
-import { useAppStore } from "@/store/app-store";
 import { formatShortDateTime } from "@/lib/date";
 
 function buildPrayerLabel(
@@ -28,7 +29,7 @@ function buildPrayerLabel(
 
 export default function PrayersPage() {
   const { t } = useI18n();
-  const prayers = useAppStore((state) => state.prayers);
+  const { prayers, isLoading, error } = usePrayers();
 
   useHeader(
     () => ({
@@ -44,6 +45,14 @@ export default function PrayersPage() {
     }),
     [t],
   );
+
+  if (error) {
+    return <LoadingScreen message={error} />;
+  }
+
+  if (isLoading) {
+    return <LoadingScreen message="Loading prayers..." />;
+  }
 
   return (
     <div className="min-h-screen bg-base-100">

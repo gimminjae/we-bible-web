@@ -6,13 +6,15 @@ import { notFound, useParams, useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
 import { BottomSheet } from "@/components/ui/bottom-sheet";
+import { LoadingScreen } from "@/components/ui/loading-screen";
 import { useAppSettings } from "@/contexts/app-settings";
+import { useBibleGrass } from "@/hooks/use-bible-grass";
 import { useDrawer } from "@/hooks/use-drawer";
 import { useHeader } from "@/hooks/use-header";
+import { usePlans } from "@/hooks/use-plans";
 import { useToast } from "@/hooks/use-toast";
 import { BIBLE_BOOKS, updatePlanComputedFields } from "@/lib/plan";
 import { getBookName } from "@/services/bible";
-import { useAppStore } from "@/store/app-store";
 import { useI18n } from "@/utils/i18n";
 
 export default function PlanDetailPage() {
@@ -21,9 +23,9 @@ export default function PlanDetailPage() {
   const { appLanguage } = useAppSettings();
   const { t } = useI18n();
   const { showToast } = useToast();
-  const plan = useAppStore((state) => state.plans.find((item) => item.id === params.id));
-  const deletePlan = useAppStore((state) => state.deletePlan);
-  const updatePlanGoalStatus = useAppStore((state) => state.updatePlanGoalStatus);
+  const { plans, deletePlan, updatePlanGoalStatus, isLoading, error } = usePlans();
+  const { isLoading: isGrassLoading, error: grassError } = useBibleGrass();
+  const plan = plans.find((item) => item.id === params.id);
   const [activeTab, setActiveTab] = useState<"ot" | "nt">("ot");
   const [selectedBookIndex, setSelectedBookIndex] = useState<number | null>(null);
   const [localStatus, setLocalStatus] = useState<number[]>([]);
@@ -58,6 +60,16 @@ export default function PlanDetailPage() {
     [deletePlan, plan, router, showToast, t],
   );
 
+  const selectedBook = useMemo(() => (selectedBookIndex === null ? null : BIBLE_BOOKS[selectedBookIndex]), [selectedBookIndex]);
+
+  if (error ?? grassError) {
+    return <LoadingScreen message={error ?? grassError ?? "PLAN_DATA_LOAD_FAILED"} />;
+  }
+
+  if (isLoading || isGrassLoading) {
+    return <LoadingScreen message="Loading plan..." />;
+  }
+
   if (!plan) {
     notFound();
   }
@@ -65,8 +77,6 @@ export default function PlanDetailPage() {
   const currentPlan = updatePlanComputedFields(plan);
   const selectedOtBooks = BIBLE_BOOKS.filter((book) => book.bookSeq <= 39 && currentPlan.selectedBookCodes.includes(book.bookCode));
   const selectedNtBooks = BIBLE_BOOKS.filter((book) => book.bookSeq >= 40 && currentPlan.selectedBookCodes.includes(book.bookCode));
-
-  const selectedBook = useMemo(() => (selectedBookIndex === null ? null : BIBLE_BOOKS[selectedBookIndex]), [selectedBookIndex]);
 
   const openBookEditor = (bookCode: string) => {
     const bookIndex = BIBLE_BOOKS.findIndex((book) => book.bookCode === bookCode);

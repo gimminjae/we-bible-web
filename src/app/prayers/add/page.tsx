@@ -3,16 +3,17 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { LoadingScreen } from "@/components/ui/loading-screen";
 import { useHeader } from "@/hooks/use-header";
+import { usePrayers } from "@/hooks/use-prayers";
 import { useToast } from "@/hooks/use-toast";
-import { useAppStore } from "@/store/app-store";
 import { useI18n } from "@/utils/i18n";
 
 export default function AddPrayerPage() {
   const router = useRouter();
   const { t } = useI18n();
   const { showToast } = useToast();
-  const addPrayer = useAppStore((state) => state.addPrayer);
+  const { addPrayer, isLoading, error } = usePrayers();
   const [requester, setRequester] = useState("");
   const [target, setTarget] = useState("");
   const [content, setContent] = useState("");
@@ -39,6 +40,14 @@ export default function AddPrayerPage() {
     }),
     [addPrayer, content, requester, router, showToast, t, target],
   );
+
+  if (error) {
+    return <LoadingScreen message={error} />;
+  }
+
+  if (isLoading) {
+    return <LoadingScreen message="Loading prayers..." />;
+  }
 
   return (
     <div className="min-h-screen bg-base-100">

@@ -3,10 +3,11 @@
 import { notFound, useParams, useRouter } from "next/navigation";
 
 import { PlanForm } from "@/components/plans/plan-form";
+import { LoadingScreen } from "@/components/ui/loading-screen";
 import { useHeader } from "@/hooks/use-header";
+import { usePlans } from "@/hooks/use-plans";
 import { updatePlanComputedFields } from "@/lib/plan";
 import { useToast } from "@/hooks/use-toast";
-import { useAppStore } from "@/store/app-store";
 import { useI18n } from "@/utils/i18n";
 
 export default function EditPlanPage() {
@@ -14,8 +15,8 @@ export default function EditPlanPage() {
   const router = useRouter();
   const { t } = useI18n();
   const { showToast } = useToast();
-  const plan = useAppStore((state) => state.plans.find((item) => item.id === params.id));
-  const updatePlanInfo = useAppStore((state) => state.updatePlanInfo);
+  const { plans, updatePlanInfo, isLoading, error } = usePlans();
+  const plan = plans.find((item) => item.id === params.id);
 
   useHeader(
     () => ({
@@ -25,6 +26,14 @@ export default function EditPlanPage() {
     }),
     [t],
   );
+
+  if (error) {
+    return <LoadingScreen message={error} />;
+  }
+
+  if (isLoading) {
+    return <LoadingScreen message="Loading plan..." />;
+  }
 
   if (!plan) {
     notFound();

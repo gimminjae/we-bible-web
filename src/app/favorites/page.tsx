@@ -6,10 +6,12 @@ import { useRouter } from "next/navigation";
 import { copyText } from "@/lib/clipboard";
 import { formatShortDateTime } from "@/lib/date";
 import { getBookName } from "@/services/bible";
+import { LoadingScreen } from "@/components/ui/loading-screen";
 import { useAppSettings } from "@/contexts/app-settings";
+import { useBibleState } from "@/hooks/use-bible-state";
+import { useFavorites } from "@/hooks/use-favorites";
 import { useHeader } from "@/hooks/use-header";
 import { useToast } from "@/hooks/use-toast";
-import { useAppStore } from "@/store/app-store";
 import { useI18n } from "@/utils/i18n";
 
 export default function FavoritesPage() {
@@ -17,9 +19,8 @@ export default function FavoritesPage() {
   const { appLanguage } = useAppSettings();
   const { t } = useI18n();
   const { showToast } = useToast();
-  const favorites = useAppStore((state) => state.favorites);
-  const goToBookChapter = useAppStore((state) => state.goToBookChapter);
-  const removeFavorites = useAppStore((state) => state.removeFavorites);
+  const { goToBookChapter } = useBibleState();
+  const { favorites, removeFavorites, isLoading, error } = useFavorites();
 
   useHeader(
     () => ({
@@ -29,6 +30,14 @@ export default function FavoritesPage() {
     }),
     [t],
   );
+
+  if (error) {
+    return <LoadingScreen message={error} />;
+  }
+
+  if (isLoading) {
+    return <LoadingScreen message="Loading favorites..." />;
+  }
 
   const sortedFavorites = [...favorites].sort((left, right) => right.createdAt.localeCompare(left.createdAt));
 

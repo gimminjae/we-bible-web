@@ -5,15 +5,19 @@ import { useEffect, useMemo, useState } from "react";
 
 import { MemoSheet } from "@/components/memos/memo-sheet";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
+import { LoadingScreen } from "@/components/ui/loading-screen";
 import { useAppSettings } from "@/contexts/app-settings";
+import { useBibleState } from "@/hooks/use-bible-state";
+import { useFavorites } from "@/hooks/use-favorites";
 import { useDrawer } from "@/hooks/use-drawer";
 import { useBibleQuery } from "@/hooks/use-bible-query";
 import { useHeader } from "@/hooks/use-header";
+import { useMemos } from "@/hooks/use-memos";
 import { useToast } from "@/hooks/use-toast";
 import { copyText } from "@/lib/clipboard";
 import { BIBLE_BOOKS } from "@/lib/plan";
 import { getBookName, versions } from "@/services/bible";
-import { getFavoriteVerseNumbers, getMemoVerseNumbers, useAppStore } from "@/store/app-store";
+import { getFavoriteVerseNumbers, getMemoVerseNumbers } from "@/store/app-store";
 import { makeCopyBibles } from "@/utils/bible.util";
 import { BIBLE_CATEGORY_KEYS, CATEGORY_BOOK_CODES, type BibleCategoryKey } from "@/utils/bible-categories";
 import { useI18n } from "@/utils/i18n";
@@ -29,14 +33,9 @@ export default function BibleReaderPage() {
   const { t } = useI18n();
   const { showToast } = useToast();
 
-  const bible = useAppStore((state) => state.bible);
-  const favorites = useAppStore((state) => state.favorites);
-  const memos = useAppStore((state) => state.memos);
-  const setBibleState = useAppStore((state) => state.setBibleState);
-  const goToBookChapter = useAppStore((state) => state.goToBookChapter);
-  const addFavorites = useAppStore((state) => state.addFavorites);
-  const removeFavorites = useAppStore((state) => state.removeFavorites);
-  const addMemo = useAppStore((state) => state.addMemo);
+  const { bible, setBibleState, goToBookChapter, isLoading: isBibleStateLoading, error: bibleStateError } = useBibleState();
+  const { favorites, addFavorites, removeFavorites, isLoading: isFavoritesLoading, error: favoritesError } = useFavorites();
+  const { memos, addMemo, isLoading: isMemosLoading, error: memosError } = useMemos();
 
   const chapterScope = `${bible.bookCode}:${bible.chapter}`;
   const [selectionState, setSelectionState] = useState<{ scope: string; verses: number[] }>({
@@ -91,6 +90,8 @@ export default function BibleReaderPage() {
   const langLabel = versions.find((item) => item.val === bible.primaryLang)?.txt ?? bible.primaryLang;
   const allSelectedAreFavorites =
     selectedVerses.length > 0 && selectedVerses.every((verse) => favoriteVerseNumbers.includes(verse));
+  const domainError = bibleStateError ?? favoritesError ?? memosError;
+  const isDomainLoading = isBibleStateLoading || isFavoritesLoading || isMemosLoading;
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
@@ -159,6 +160,14 @@ export default function BibleReaderPage() {
 
     return makeCopyBibles(contentList);
   }, [bible.chapter, bookName, selectedVerses, verses]);
+
+  if (domainError) {
+    return <LoadingScreen message={domainError} />;
+  }
+
+  if (isDomainLoading) {
+    return <LoadingScreen message="Loading reading data..." />;
+  }
 
   const updateSelection = (versesToStore: number[]) => {
     setSelectionState({

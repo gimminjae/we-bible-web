@@ -3,16 +3,17 @@
 import { useRouter } from "next/navigation";
 
 import { PlanForm } from "@/components/plans/plan-form";
+import { LoadingScreen } from "@/components/ui/loading-screen";
 import { useHeader } from "@/hooks/use-header";
+import { usePlans } from "@/hooks/use-plans";
 import { useToast } from "@/hooks/use-toast";
-import { useAppStore } from "@/store/app-store";
 import { useI18n } from "@/utils/i18n";
 
 export default function AddPlanPage() {
   const router = useRouter();
   const { t } = useI18n();
   const { showToast } = useToast();
-  const addPlan = useAppStore((state) => state.addPlan);
+  const { addPlan, isLoading, error } = usePlans();
 
   useHeader(
     () => ({
@@ -22,6 +23,14 @@ export default function AddPlanPage() {
     }),
     [t],
   );
+
+  if (error) {
+    return <LoadingScreen message={error} />;
+  }
+
+  if (isLoading) {
+    return <LoadingScreen message="Loading plans..." />;
+  }
 
   return (
     <div className="min-h-screen bg-base-100">

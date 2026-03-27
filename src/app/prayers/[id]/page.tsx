@@ -4,10 +4,11 @@ import { Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { notFound, useParams, useRouter } from "next/navigation";
 
+import { LoadingScreen } from "@/components/ui/loading-screen";
 import { useHeader } from "@/hooks/use-header";
+import { usePrayers } from "@/hooks/use-prayers";
 import { useToast } from "@/hooks/use-toast";
 import { formatShortDateTime } from "@/lib/date";
-import { useAppStore } from "@/store/app-store";
 import { useI18n } from "@/utils/i18n";
 
 export default function PrayerDetailPage() {
@@ -15,9 +16,8 @@ export default function PrayerDetailPage() {
   const router = useRouter();
   const { t } = useI18n();
   const { showToast } = useToast();
-  const prayer = useAppStore((state) => state.prayers.find((item) => item.id === params.id));
-  const deletePrayer = useAppStore((state) => state.deletePrayer);
-  const deletePrayerContent = useAppStore((state) => state.deletePrayerContent);
+  const { prayers, deletePrayer, deletePrayerContent, isLoading, error } = usePrayers();
+  const prayer = prayers.find((item) => item.id === params.id);
 
   useHeader(
     () => ({
@@ -47,6 +47,14 @@ export default function PrayerDetailPage() {
     }),
     [deletePrayer, prayer, router, showToast, t],
   );
+
+  if (error) {
+    return <LoadingScreen message={error} />;
+  }
+
+  if (isLoading) {
+    return <LoadingScreen message="Loading prayer..." />;
+  }
 
   if (!prayer) {
     notFound();

@@ -1,7 +1,7 @@
 "use client";
 
 import type { BibleLang, BibleSearchInfo, FavoriteVerseRecord } from "@/components/bible/types";
-import type { GrassColorTheme, GrassDataMap, GrassDayEntry } from "@/lib/grass";
+import type { GrassColorTheme, GrassDayEntry } from "@/lib/grass";
 import {
   BIBLE_BOOKS,
   calcCurrentReadCount,
@@ -34,6 +34,7 @@ export const USER_PLANS_TABLE = "plans";
 export const USER_PRAYERS_TABLE = "prayers";
 export const USER_PRAYER_CONTENTS_TABLE = "prayer_contents";
 export const USER_GRASS_TABLE = "bible_grass";
+const GRASS_META_ROW_DATE = "__meta__";
 const WEB_SUPABASE_SCHEMA_PATH = "C:\\Users\\minja\\mylists\\we-bible-web\\supabase\\schema.sql";
 
 type StateRow = {
@@ -286,10 +287,6 @@ function buildStateRows(state: PersistedState) {
       key: "bibleSearchInfo",
       value: state.bible,
     },
-    {
-      key: "grassColorTheme",
-      value: state.grassTheme,
-    },
   ];
 }
 
@@ -298,6 +295,12 @@ function getAppStateSlice(state: PersistedState) {
     theme: state.theme,
     appLanguage: state.appLanguage,
     bible: state.bible,
+  };
+}
+
+function getGrassSlice(state: PersistedState) {
+  return {
+    grassData: state.grassData,
     grassTheme: state.grassTheme,
     stepRewardUsedDate: state.stepRewardUsedDate,
   };
@@ -310,7 +313,7 @@ function buildPersistedSliceSignatures(state: PersistedState): PersistedSliceSig
     memos: JSON.stringify(state.memos),
     plans: JSON.stringify(state.plans),
     prayers: JSON.stringify(state.prayers),
-    grassData: JSON.stringify(state.grassData),
+    grassData: JSON.stringify(getGrassSlice(state)),
   };
 }
 
@@ -324,8 +327,6 @@ function createInitialSlicePatch(requestedSlices: PersistedSliceKey[]): Partial<
         patch.theme = initial.theme;
         patch.appLanguage = initial.appLanguage;
         patch.bible = initial.bible;
-        patch.grassTheme = initial.grassTheme;
-        patch.stepRewardUsedDate = initial.stepRewardUsedDate;
         break;
       case "favorites":
         patch.favorites = initial.favorites;
@@ -341,6 +342,8 @@ function createInitialSlicePatch(requestedSlices: PersistedSliceKey[]): Partial<
         break;
       case "grassData":
         patch.grassData = initial.grassData;
+        patch.grassTheme = initial.grassTheme;
+        patch.stepRewardUsedDate = initial.stepRewardUsedDate;
         break;
       default:
         break;
@@ -371,8 +374,8 @@ function getChangedPersistedSlices(
   previous: PersistedSliceSignatureCache | null | undefined,
   next: PersistedSliceSignatures,
 ): PersistedSliceKey[] {
-  if (!previous) return [...PERSISTED_SLICE_KEYS];
-  return PERSISTED_SLICE_KEYS.filter((key) => previous[key] == null || previous[key] !== next[key]);
+  if (!previous) return [];
+  return PERSISTED_SLICE_KEYS.filter((key) => previous[key] != null && previous[key] !== next[key]);
 }
 
 export function getMissingPersistedSlices(userId: string, requestedSlices: PersistedSliceKey[]): PersistedSliceKey[] {
@@ -403,7 +406,7 @@ async function savePersistedSlicesToSupabase(
         await replacePrayers(userId, snapshot.prayers);
         break;
       case "grassData":
-        await replaceGrass(userId, snapshot.grassData);
+        await replaceGrass(userId, snapshot);
         break;
       default:
         break;
@@ -444,29 +447,6 @@ async function replaceStateRows(userId: string, state: PersistedState): Promise<
     });
     if (error) throwSupabaseError(error);
   }
-
-  if (state.stepRewardUsedDate) {
-    const { error } = await supabase.from(USER_BIBLE_STATE_TABLE).upsert(
-      {
-        user_id: userId,
-        key: "stepRewardUsedDate",
-        value: state.stepRewardUsedDate,
-      },
-      {
-        onConflict: "user_id,key",
-      },
-    );
-    if (error) throwSupabaseError(error);
-    return;
-  }
-
-  const { error } = await supabase
-    .from(USER_BIBLE_STATE_TABLE)
-    .delete()
-    .eq("user_id", userId)
-    .eq("key", "stepRewardUsedDate");
-
-  if (error) throwSupabaseError(error);
 }
 
 async function replaceFavorites(userId: string, favorites: FavoriteVerseRecord[]): Promise<void> {
@@ -634,12 +614,12 @@ async function replacePrayers(userId: string, prayers: PrayerRecord[]): Promise<
   if (error) throwSupabaseError(error);
 }
 
-async function replaceGrass(userId: string, grassData: GrassDataMap): Promise<void> {
+async function replaceGrass(userId: string, state: PersistedState): Promise<void> {
   const supabase = createBrowserSupabaseClient();
   const { error: deleteError } = await supabase.from(USER_GRASS_TABLE).delete().eq("user_id", userId);
   if (deleteError) throwSupabaseError(deleteError);
 
-  const payload = Object.values(grassData).map((day) => ({
+  const payload: Array<{ user_id: string; date: string; data: unknown }> = Object.values(state.grassData).map((day) => ({
     user_id: userId,
     date: day.date,
     data: {
@@ -648,6 +628,16 @@ async function replaceGrass(userId: string, grassData: GrassDataMap): Promise<vo
       fillYn: day.fillYn,
     },
   }));
+
+  payload.push({
+    user_id: userId,
+    date: GRASS_META_ROW_DATE,
+    data: {
+      type: "meta",
+      grassTheme: state.grassTheme,
+      stepRewardUsedDate: state.stepRewardUsedDate,
+    },
+  });
 
   if (!payload.length) return;
 
@@ -764,13 +754,12 @@ export async function loadPersistedSlicesFromSupabase(
       ? (stateMap.get("appLanguage") as PersistedState["appLanguage"])
       : initial.appLanguage;
     patch.bible = normalizeBibleState(stateMap.get("bibleSearchInfo"), initial.bible);
-    patch.grassTheme = isGrassTheme(stateMap.get("grassColorTheme"))
-      ? (stateMap.get("grassColorTheme") as GrassColorTheme)
-      : initial.grassTheme;
-    patch.stepRewardUsedDate =
-      typeof stateMap.get("stepRewardUsedDate") === "string"
-        ? (stateMap.get("stepRewardUsedDate") as string)
-        : initial.stepRewardUsedDate;
+    if (isGrassTheme(stateMap.get("grassColorTheme"))) {
+      patch.grassTheme = stateMap.get("grassColorTheme") as GrassColorTheme;
+    }
+    if (typeof stateMap.get("stepRewardUsedDate") === "string") {
+      patch.stepRewardUsedDate = stateMap.get("stepRewardUsedDate") as string;
+    }
   }
 
   if (needsFavorites) {
@@ -870,9 +859,22 @@ export async function loadPersistedSlicesFromSupabase(
 
   if (needsGrassData) {
     const grassRows = (grassResult?.data ?? []) as GrassRow[];
+    const metaRow = grassRows.find((row) => row.date === GRASS_META_ROW_DATE);
+    const meta = metaRow && typeof metaRow.data === "object" && metaRow.data !== null
+      ? (metaRow.data as { grassTheme?: unknown; stepRewardUsedDate?: unknown })
+      : null;
+
     patch.grassData = Object.fromEntries(
-      grassRows.map((row) => [row.date, normalizeGrassDayValue(row.date, row.data)]),
+      grassRows
+        .filter((row) => row.date !== GRASS_META_ROW_DATE)
+        .map((row) => [row.date, normalizeGrassDayValue(row.date, row.data)]),
     );
+    if (isGrassTheme(meta?.grassTheme)) {
+      patch.grassTheme = meta.grassTheme as GrassColorTheme;
+    }
+    if (typeof meta?.stepRewardUsedDate === "string") {
+      patch.stepRewardUsedDate = meta.stepRewardUsedDate;
+    }
   }
 
   const cacheState = Object.assign(createInitialPersistedState(), patch);

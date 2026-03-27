@@ -4,12 +4,13 @@ import { Copy, Plus } from "lucide-react";
 import Link from "next/link";
 
 import { MemoSheet } from "@/components/memos/memo-sheet";
+import { LoadingScreen } from "@/components/ui/loading-screen";
 import { useDrawer } from "@/hooks/use-drawer";
 import { useHeader } from "@/hooks/use-header";
+import { useMemos } from "@/hooks/use-memos";
 import { copyText } from "@/lib/clipboard";
 import { formatShortDateTime } from "@/lib/date";
 import { useToast } from "@/hooks/use-toast";
-import { useAppStore } from "@/store/app-store";
 import { useI18n } from "@/utils/i18n";
 
 function buildMemoCopyText(title: string, verseText: string, content: string, untitled: string) {
@@ -19,8 +20,7 @@ function buildMemoCopyText(title: string, verseText: string, content: string, un
 export default function MemosPage() {
   const { t } = useI18n();
   const { showToast } = useToast();
-  const memos = useAppStore((state) => state.memos);
-  const addMemo = useAppStore((state) => state.addMemo);
+  const { memos, addMemo, isLoading, error } = useMemos();
   const memoDrawer = useDrawer();
 
   useHeader(
@@ -37,6 +37,14 @@ export default function MemosPage() {
     }),
     [t],
   );
+
+  if (error) {
+    return <LoadingScreen message={error} />;
+  }
+
+  if (isLoading) {
+    return <LoadingScreen message="Loading memos..." />;
+  }
 
   return (
     <div className="min-h-screen bg-base-100">

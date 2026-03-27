@@ -5,12 +5,13 @@ import { notFound, useParams, useRouter } from "next/navigation";
 import { useMemo } from "react";
 
 import { MemoSheet } from "@/components/memos/memo-sheet";
+import { LoadingScreen } from "@/components/ui/loading-screen";
 import { useDrawer } from "@/hooks/use-drawer";
 import { useHeader } from "@/hooks/use-header";
+import { useMemos } from "@/hooks/use-memos";
 import { copyText } from "@/lib/clipboard";
 import { formatShortDateTime } from "@/lib/date";
 import { useToast } from "@/hooks/use-toast";
-import { useAppStore } from "@/store/app-store";
 import { useI18n } from "@/utils/i18n";
 
 function buildMemoCopyText(title: string, verseText: string, content: string, untitled: string) {
@@ -22,9 +23,8 @@ export default function MemoDetailPage() {
   const router = useRouter();
   const { t } = useI18n();
   const { showToast } = useToast();
-  const memo = useAppStore((state) => state.memos.find((item) => item.id === params.id));
-  const updateMemo = useAppStore((state) => state.updateMemo);
-  const deleteMemo = useAppStore((state) => state.deleteMemo);
+  const { memos, updateMemo, deleteMemo, isLoading, error } = useMemos();
+  const memo = useMemo(() => memos.find((item) => item.id === params.id), [memos, params.id]);
   const editDrawer = useDrawer();
 
   const copyTextValue = useMemo(() => {
@@ -71,6 +71,14 @@ export default function MemoDetailPage() {
     }),
     [copyTextValue, deleteMemo, memo, router, showToast, t],
   );
+
+  if (error) {
+    return <LoadingScreen message={error} />;
+  }
+
+  if (isLoading) {
+    return <LoadingScreen message="Loading memo..." />;
+  }
 
   if (!memo) {
     notFound();

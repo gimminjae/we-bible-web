@@ -3,15 +3,16 @@
 import { Plus } from "lucide-react";
 import Link from "next/link";
 
+import { LoadingScreen } from "@/components/ui/loading-screen";
 import { useHeader } from "@/hooks/use-header";
+import { usePlans } from "@/hooks/use-plans";
 import { formatShortDate } from "@/lib/date";
 import { getPlanGoalSummary, updatePlanComputedFields } from "@/lib/plan";
 import { useI18n } from "@/utils/i18n";
-import { useAppStore } from "@/store/app-store";
 
 export default function PlansPage() {
   const { t } = useI18n();
-  const plans = useAppStore((state) => state.plans).map((plan) => updatePlanComputedFields(plan));
+  const { plans, isLoading, error } = usePlans();
 
   useHeader(
     () => ({
@@ -28,15 +29,25 @@ export default function PlansPage() {
     [t],
   );
 
+  if (error) {
+    return <LoadingScreen message={error} />;
+  }
+
+  if (isLoading) {
+    return <LoadingScreen message="Loading plans..." />;
+  }
+
+  const computedPlans = plans.map((plan) => updatePlanComputedFields(plan));
+
   return (
     <div className="min-h-screen bg-base-100">
       <div className="space-y-3 px-4 py-5">
-        {plans.length === 0 ? (
+        {computedPlans.length === 0 ? (
           <div className="rounded-[1.75rem] border border-dashed border-base-300 bg-base-100 px-5 py-10 text-center text-sm text-base-content/55">
             {t("mypage.emptyPlans")}
           </div>
         ) : (
-          plans.map((plan) => {
+          computedPlans.map((plan) => {
             const summary = getPlanGoalSummary(plan.selectedBookCodes);
             return (
               <Link key={plan.id} href={`/plans/${plan.id}`} className="block rounded-[1.75rem] border border-base-300 bg-base-100 p-5 shadow-sm transition hover:bg-base-200/50">
