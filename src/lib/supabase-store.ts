@@ -449,8 +449,23 @@ async function replacePlans(userId: string, plans: PlanRecord[]): Promise<void> 
 async function replacePrayers(userId: string, prayers: PrayerRecord[]): Promise<void> {
   const supabase = createBrowserSupabaseClient();
 
-  const { error: deleteContentsError } = await supabase.from(USER_PRAYER_CONTENTS_TABLE).delete().eq("user_id", userId);
-  if (deleteContentsError) throwSupabaseError(deleteContentsError);
+  const { data: existingPrayers, error: existingPrayersError } = await supabase
+    .from(USER_PRAYERS_TABLE)
+    .select("id")
+    .eq("user_id", userId);
+  if (existingPrayersError) throwSupabaseError(existingPrayersError);
+
+  const existingPrayerIds = (existingPrayers ?? [])
+    .map((row) => toNumber((row as { id?: unknown }).id, NaN))
+    .filter((value) => Number.isFinite(value));
+
+  if (existingPrayerIds.length > 0) {
+    const { error: deleteContentsError } = await supabase
+      .from(USER_PRAYER_CONTENTS_TABLE)
+      .delete()
+      .in("prayer_id", existingPrayerIds);
+    if (deleteContentsError) throwSupabaseError(deleteContentsError);
+  }
 
   const { error: deletePrayersError } = await supabase.from(USER_PRAYERS_TABLE).delete().eq("user_id", userId);
   if (deletePrayersError) throwSupabaseError(deletePrayersError);
@@ -481,7 +496,6 @@ async function replacePrayers(userId: string, prayers: PrayerRecord[]): Promise<
     if (!prayerId) return [];
 
     return prayer.contents.map((content) => ({
-      user_id: userId,
       prayer_id: prayerId,
       client_id: content.id,
       content: content.content,
@@ -542,7 +556,6 @@ export async function loadPersistedStateFromSupabase(userId: string): Promise<Pe
     memoVersesResult,
     plansResult,
     prayersResult,
-    prayerContentsResult,
     grassResult,
   ] = await Promise.all([
     supabase.from(USER_BIBLE_STATE_TABLE).select("key, value").eq("user_id", userId),
@@ -563,12 +576,6 @@ export async function loadPersistedStateFromSupabase(userId: string): Promise<Pe
       .order("created_at", { ascending: false })
       .order("id", { ascending: false }),
     supabase.from(USER_PRAYERS_TABLE).select("id, client_id, requester, target, created_at").eq("user_id", userId).order("created_at", { ascending: false }).order("id", { ascending: false }),
-    supabase
-      .from(USER_PRAYER_CONTENTS_TABLE)
-      .select("id, client_id, prayer_id, content, registered_at")
-      .eq("user_id", userId)
-      .order("registered_at", { ascending: false })
-      .order("id", { ascending: false }),
     supabase.from(USER_GRASS_TABLE).select("date, data").eq("user_id", userId),
   ]);
 
@@ -579,7 +586,6 @@ export async function loadPersistedStateFromSupabase(userId: string): Promise<Pe
     memoVersesResult,
     plansResult,
     prayersResult,
-    prayerContentsResult,
     grassResult,
   ];
   for (const result of results) {
@@ -592,8 +598,21 @@ export async function loadPersistedStateFromSupabase(userId: string): Promise<Pe
   const memoVerseRows = (memoVersesResult.data ?? []) as MemoVerseRow[];
   const planRows = (plansResult.data ?? []) as PlanRow[];
   const prayerRows = (prayersResult.data ?? []) as PrayerRow[];
-  const prayerContentRows = (prayerContentsResult.data ?? []) as PrayerContentRow[];
   const grassRows = (grassResult.data ?? []) as GrassRow[];
+  const prayerIds = [...new Set(prayerRows.map((row) => row.id).filter((value) => Number.isFinite(value)))];
+  let prayerContentRows: PrayerContentRow[] = [];
+
+  if (prayerIds.length > 0) {
+    const { data, error } = await supabase
+      .from(USER_PRAYER_CONTENTS_TABLE)
+      .select("id, client_id, prayer_id, content, registered_at")
+      .in("prayer_id", prayerIds)
+      .order("registered_at", { ascending: false })
+      .order("id", { ascending: false });
+
+    if (error) throwSupabaseError(error);
+    prayerContentRows = (data ?? []) as PrayerContentRow[];
+  }
 
   const hasRemoteData =
     stateRows.length > 0 ||
