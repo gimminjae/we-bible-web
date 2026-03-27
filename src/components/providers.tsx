@@ -1,23 +1,24 @@
 "use client";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useEffect, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 
+import { LoadingScreen } from "@/components/ui/loading-screen";
 import { ToastViewport } from "@/components/ui/toast-viewport";
 import { AppSettingsProvider } from "@/contexts/app-settings";
+import { AuthProvider, useAuth } from "@/contexts/auth-context";
 import { HeaderProvider } from "@/contexts/header-context";
-import { useAppStore } from "@/store/app-store";
+import { useHydrated } from "@/hooks/use-hydrated";
 
-function StoreHydrator() {
-  const setHasHydrated = useAppStore((state) => state.setHasHydrated);
+function ProvidersGate({ children }: { children: ReactNode }) {
+  const hydrated = useHydrated();
+  const { isLoadingSession, isSyncingData } = useAuth();
 
-  useEffect(() => {
-    Promise.resolve(useAppStore.persist.rehydrate()).then(() => {
-      setHasHydrated(true);
-    });
-  }, [setHasHydrated]);
+  if (!hydrated || isLoadingSession || isSyncingData) {
+    return <LoadingScreen message="Synchronizing account data..." />;
+  }
 
-  return null;
+  return <>{children}</>;
 }
 
 export function Providers({ children }: { children: ReactNode }) {
@@ -35,13 +36,14 @@ export function Providers({ children }: { children: ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <AppSettingsProvider>
-        <HeaderProvider>
-          <StoreHydrator />
-          {children}
-          <ToastViewport />
-        </HeaderProvider>
-      </AppSettingsProvider>
+      <AuthProvider>
+        <AppSettingsProvider>
+          <HeaderProvider>
+            <ProvidersGate>{children}</ProvidersGate>
+            <ToastViewport />
+          </HeaderProvider>
+        </AppSettingsProvider>
+      </AuthProvider>
     </QueryClientProvider>
   );
 }

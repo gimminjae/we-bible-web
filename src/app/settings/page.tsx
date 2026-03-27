@@ -1,11 +1,11 @@
 "use client";
 
-import type { User } from "@supabase/supabase-js";
 import { ChevronDown, Loader2, LogOut, Moon, Sun } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { BottomSheet } from "@/components/ui/bottom-sheet";
+import { useAuth } from "@/contexts/auth-context";
 import { useAppSettings } from "@/contexts/app-settings";
 import { useDrawer } from "@/hooks/use-drawer";
 import { useHeader } from "@/hooks/use-header";
@@ -13,7 +13,6 @@ import {
   getOAuthRedirectTo,
   getUserAccountLabel,
   getUserProvider,
-  isSupabaseConfigured,
   type SocialProvider,
 } from "@/lib/supabase";
 import { createBrowserSupabaseClient } from "@/lib/supabase-browser";
@@ -40,14 +39,23 @@ export default function SettingsPage() {
   const languagePickerDrawer = useDrawer();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const {
+    currentUser,
+    isConfigured,
+    isLoadingSession,
+    isSyncingData,
+    lastError,
+    signIn,
+    signOut,
+    signUp,
+    clearLastError,
+  } = useAuth();
 
-  const [isLoadingSession, setIsLoadingSession] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSignUpMode, setIsSignUpMode] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
 
   useHeader(
     () => ({
@@ -72,41 +80,13 @@ export default function SettingsPage() {
   }, [router, searchParams, showToast, t]);
 
   useEffect(() => {
-    if (!isSupabaseConfigured()) {
-      setIsLoadingSession(false);
-      return;
-    }
-
-    const supabase = createBrowserSupabaseClient();
-    let isMounted = true;
-
-    const loadUser = async () => {
-      const { data, error } = await supabase.auth.getUser();
-      if (!isMounted) return;
-
-      setCurrentUser(error ? null : data.user);
-      setIsLoadingSession(false);
-    };
-
-    void loadUser();
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!isMounted) return;
-      setCurrentUser(session?.user ?? null);
-      setIsLoadingSession(false);
-    });
-
-    return () => {
-      isMounted = false;
-      subscription.unsubscribe();
-    };
-  }, []);
+    if (!lastError) return;
+    showToast(lastError);
+    clearLastError();
+  }, [clearLastError, lastError, showToast]);
 
   const handleEmailAuth = async () => {
-    if (!isSupabaseConfigured()) return;
-    const supabase = createBrowserSupabaseClient();
+    if (!isConfigured) return;
 
     if (!email.trim()) {
       showToast(t("settings.requiredEmail"));
@@ -143,26 +123,12 @@ export default function SettingsPage() {
     setIsSubmitting(true);
     try {
       if (isSignUpMode) {
-        const { data, error } = await supabase.auth.signUp({
-          email: email.trim(),
-          password,
-        });
-
-        if (error) throw error;
-
-        if (data.session?.user) {
-          setCurrentUser(data.session.user);
-        } else {
+        const result = await signUp(email.trim(), password);
+        if (result.requiresEmailVerification) {
           showToast(t("settings.emailVerifyHint"));
         }
       } else {
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email: email.trim(),
-          password,
-        });
-
-        if (error) throw error;
-        setCurrentUser(data.user);
+        await signIn(email.trim(), password);
       }
     } catch {
       showToast(isSignUpMode ? t("settings.signUpFailed") : t("settings.loginFailed"));
@@ -172,7 +138,7 @@ export default function SettingsPage() {
   };
 
   const handleSocialLogin = async (provider: SocialProvider) => {
-    if (!isSupabaseConfigured()) return;
+    if (!isConfigured) return;
 
     const supabase = createBrowserSupabaseClient();
     setIsSubmitting(true);
@@ -193,15 +159,11 @@ export default function SettingsPage() {
   };
 
   const handleLogout = async () => {
-    if (!isSupabaseConfigured()) return;
-
-    const supabase = createBrowserSupabaseClient();
+    if (!isConfigured) return;
     setIsSubmitting(true);
 
     try {
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
-      setCurrentUser(null);
+      await signOut();
     } catch {
       showToast(t("settings.logoutFailed"));
     } finally {
@@ -247,9 +209,9 @@ export default function SettingsPage() {
         <section className="space-y-4 rounded-[1.75rem] border border-base-300 bg-base-100 p-5 shadow-sm">
           <div>
             <p className="label-text font-medium">{t("settings.account")}</p>
-            {!isSupabaseConfigured() ? (
+            {!isConfigured ? (
               <p className="mt-1 text-sm text-base-content/60">{t("settings.authNotConfigured")}</p>
-            ) : isLoadingSession ? (
+            ) : isLoadingSession || isSyncingData ? (
               <p className="mt-1 text-sm text-base-content/60">{t("settings.authChecking")}</p>
             ) : currentUser ? (
               <p className="mt-1 text-sm text-base-content/60">{userLabel}</p>
@@ -258,7 +220,7 @@ export default function SettingsPage() {
             )}
           </div>
 
-          {isSupabaseConfigured() && !isLoadingSession && !currentUser ? (
+          {isConfigured && !isLoadingSession && !isSyncingData && !currentUser ? (
             <div className="space-y-3">
               <label className="input input-bordered flex items-center gap-2">
                 <span className="text-sm text-base-content/60">{t("settings.email")}</span>
@@ -302,7 +264,7 @@ export default function SettingsPage() {
             </div>
           ) : null}
 
-          {isSupabaseConfigured() && currentUser ? (
+          {isConfigured && currentUser ? (
             <button type="button" className="btn btn-outline w-full" onClick={() => void handleLogout()} disabled={isSubmitting}>
               <LogOut className="size-4" />
               {t("settings.logout")}

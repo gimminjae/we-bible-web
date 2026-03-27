@@ -179,69 +179,75 @@ async function ensureLegacyMigration(database: WebSqlDatabase): Promise<void> {
   await legacyMigrationPromise;
 }
 
+export async function getLocalPersistedItem<T>(name: string): Promise<StorageValue<T> | null> {
+  if (!isBrowser()) {
+    const source = getLocalStorageValue(name);
+    return source ? (JSON.parse(source) as StorageValue<T>) : null;
+  }
+
+  const database = await getWebSqlDatabase();
+  if (!database) {
+    const source = getLocalStorageValue(name);
+    return source ? (JSON.parse(source) as StorageValue<T>) : null;
+  }
+
+  await ensureLegacyMigration(database);
+
+  const source = await runSql(
+    database,
+    `SELECT value FROM ${TABLE_NAME} WHERE key = ? LIMIT 1`,
+    [name],
+    (resultSet) => (resultSet.rows.length ? resultSet.rows.item(0).value : null),
+  );
+
+  return source ? (JSON.parse(source) as StorageValue<T>) : null;
+}
+
+export async function setLocalPersistedItem<T>(name: string, value: StorageValue<T>): Promise<void> {
+  const serialized = JSON.stringify(value);
+
+  if (!isBrowser()) {
+    setLocalStorageValue(name, serialized);
+    return;
+  }
+
+  const database = await getWebSqlDatabase();
+  if (!database) {
+    setLocalStorageValue(name, serialized);
+    return;
+  }
+
+  await ensureLegacyMigration(database);
+
+  await runSql(
+    database,
+    `INSERT OR REPLACE INTO ${TABLE_NAME} (key, value) VALUES (?, ?)`,
+    [name, serialized],
+    () => undefined,
+  );
+}
+
+export async function removeLocalPersistedItem(name: string): Promise<void> {
+  if (!isBrowser()) {
+    removeLocalStorageValue(name);
+    return;
+  }
+
+  const database = await getWebSqlDatabase();
+  if (!database) {
+    removeLocalStorageValue(name);
+    return;
+  }
+
+  await ensureLegacyMigration(database);
+
+  await runSql(database, `DELETE FROM ${TABLE_NAME} WHERE key = ?`, [name], () => undefined);
+}
+
 export function createSafeJsonStorage<T>(): PersistStorage<T> {
   return {
-    getItem: async (name: string): Promise<StorageValue<T> | null> => {
-      if (!isBrowser()) {
-        const source = getLocalStorageValue(name);
-        return source ? (JSON.parse(source) as StorageValue<T>) : null;
-      }
-
-      const database = await getWebSqlDatabase();
-      if (!database) {
-        const source = getLocalStorageValue(name);
-        return source ? (JSON.parse(source) as StorageValue<T>) : null;
-      }
-
-      await ensureLegacyMigration(database);
-
-      const source = await runSql(
-        database,
-        `SELECT value FROM ${TABLE_NAME} WHERE key = ? LIMIT 1`,
-        [name],
-        (resultSet) => (resultSet.rows.length ? resultSet.rows.item(0).value : null),
-      );
-
-      return source ? (JSON.parse(source) as StorageValue<T>) : null;
-    },
-    setItem: async (name: string, value: StorageValue<T>): Promise<void> => {
-      const serialized = JSON.stringify(value);
-
-      if (!isBrowser()) {
-        setLocalStorageValue(name, serialized);
-        return;
-      }
-
-      const database = await getWebSqlDatabase();
-      if (!database) {
-        setLocalStorageValue(name, serialized);
-        return;
-      }
-
-      await ensureLegacyMigration(database);
-
-      await runSql(
-        database,
-        `INSERT OR REPLACE INTO ${TABLE_NAME} (key, value) VALUES (?, ?)`,
-        [name, serialized],
-        () => undefined,
-      );
-    },
-    removeItem: async (name: string): Promise<void> => {
-      if (!isBrowser()) {
-        removeLocalStorageValue(name);
-        return;
-      }
-
-      const database = await getWebSqlDatabase();
-      if (!database) {
-        removeLocalStorageValue(name);
-        return;
-      }
-
-      await ensureLegacyMigration(database);
-
-      await runSql(database, `DELETE FROM ${TABLE_NAME} WHERE key = ?`, [name], () => undefined);
-    },
+    getItem: (name: string) => getLocalPersistedItem<T>(name),
+    setItem: (name: string, value: StorageValue<T>) => setLocalPersistedItem(name, value),
+    removeItem: (name: string) => removeLocalPersistedItem(name),
   };
 }

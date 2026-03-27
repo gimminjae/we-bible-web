@@ -7,7 +7,7 @@ import type { BibleLang, FavoriteVerseRecord } from "@/components/bible/types";
 import { createId, formatDateTime, todayString } from "@/lib/date";
 import { type GrassColorTheme, type GrassDataMap, fillGrassByPoint, syncGrassFromPlanSave } from "@/lib/grass";
 import { type GoalStatus, type PlanRecord, createInitialPlan, updatePlanComputedFields } from "@/lib/plan";
-import { createSafeJsonStorage } from "@/lib/storage";
+import { createAppPersistStorage } from "@/lib/app-persist-storage";
 
 export type AppTheme = "light" | "night";
 export type AppLanguage = "ko" | "en";
@@ -56,6 +56,8 @@ export type PersistedState = {
   grassTheme: GrassColorTheme;
   stepRewardUsedDate: string | null;
 };
+
+export const APP_STORE_PERSIST_KEY = "we-bible-web-storage";
 
 type AppStore = PersistedState & {
   hasHydrated: boolean;
@@ -108,27 +110,68 @@ type AppStore = PersistedState & {
   replacePersistedState: (state: PersistedState) => void;
 };
 
-export const initialPersistedState: PersistedState = {
-  theme: "light",
-  appLanguage: "ko",
-  bible: {
-    bookCode: "genesis",
-    chapter: 1,
-    primaryLang: "ko",
-    secondaryLang: "en",
-    dualLang: false,
-    fontScale: 1,
-  },
-  favorites: [],
-  memos: [],
-  prayers: [],
-  plans: [],
-  grassData: {},
-  grassTheme: "green",
-  stepRewardUsedDate: null,
-};
+export function createInitialPersistedState(): PersistedState {
+  return {
+    theme: "light",
+    appLanguage: "ko",
+    bible: {
+      bookCode: "genesis",
+      chapter: 1,
+      primaryLang: "ko",
+      secondaryLang: "en",
+      dualLang: false,
+      fontScale: 1,
+    },
+    favorites: [],
+    memos: [],
+    prayers: [],
+    plans: [],
+    grassData: {},
+    grassTheme: "green",
+    stepRewardUsedDate: null,
+  };
+}
 
-const storage = createSafeJsonStorage<PersistedState>();
+export const initialPersistedState: PersistedState = createInitialPersistedState();
+
+export function pickPersistedState(state: PersistedState): PersistedState {
+  return {
+    theme: state.theme,
+    appLanguage: state.appLanguage,
+    bible: { ...state.bible },
+    favorites: state.favorites.map((favorite) => ({ ...favorite })),
+    memos: state.memos.map((memo) => ({
+      ...memo,
+      ...(memo.verseNumbers ? { verseNumbers: [...memo.verseNumbers] } : {}),
+    })),
+    prayers: state.prayers.map((prayer) => ({
+      ...prayer,
+      contents: prayer.contents.map((content) => ({ ...content })),
+    })),
+    plans: state.plans.map((plan) => ({
+      ...plan,
+      goalStatus: plan.goalStatus.map((chapterStatus) => [...chapterStatus]),
+      selectedBookCodes: [...plan.selectedBookCodes],
+    })),
+    grassData: Object.fromEntries(
+      Object.entries(state.grassData).map(([date, value]) => [
+        date,
+        {
+          date: value.date,
+          fillYn: value.fillYn,
+          data: value.data.map((entry) => ({
+            bookCode: entry.bookCode,
+            readChapter: [...entry.readChapter],
+          })),
+        },
+      ]),
+    ),
+    grassTheme: state.grassTheme,
+    stepRewardUsedDate: state.stepRewardUsedDate,
+  };
+}
+
+const storage = createAppPersistStorage<PersistedState>();
 
 export const useAppStore = create<AppStore>()(
   persist(
@@ -349,21 +392,10 @@ export const useAppStore = create<AppStore>()(
       replacePersistedState: (state) => set({ ...state }),
     }),
     {
-      name: "we-bible-web-storage",
+      name: APP_STORE_PERSIST_KEY,
       storage,
       skipHydration: true,
-      partialize: (state) => ({
-        theme: state.theme,
-        appLanguage: state.appLanguage,
-        bible: state.bible,
-        favorites: state.favorites,
-        memos: state.memos,
-        prayers: state.prayers,
-        plans: state.plans,
-        grassData: state.grassData,
-        grassTheme: state.grassTheme,
-        stepRewardUsedDate: state.stepRewardUsedDate,
-      }),
+      partialize: (state) => pickPersistedState(state),
     },
   ),
 );
