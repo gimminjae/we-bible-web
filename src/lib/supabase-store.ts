@@ -10,6 +10,7 @@ import {
   calcRestDay,
   calcTotalReadCount,
   createEmptyGoalStatus,
+  getPlanScope,
   updatePlanComputedFields,
   type GoalStatus,
   type PlanRecord,
@@ -69,6 +70,7 @@ type MemoVerseRow = {
 
 type PlanRow = {
   id: number;
+  user_id?: string | null;
   client_id: string | null;
   plan_name: string | null;
   start_date: string | null;
@@ -82,6 +84,8 @@ type PlanRow = {
   selected_book_codes: unknown;
   created_at: string | null;
   updated_at: string | null;
+  church_id?: number | null;
+  team_id?: number | null;
 };
 
 type PrayerRow = {
@@ -272,6 +276,10 @@ function createPlanRecordFromRow(row: PlanRow): PlanRecord {
     selectedBookCodes,
     createdAt: row.created_at ?? "",
     updatedAt: row.updated_at ?? row.created_at ?? "",
+    churchId: row.church_id == null ? null : String(row.church_id),
+    teamId: row.team_id == null ? null : String(row.team_id),
+    createdByUserId: row.user_id ?? null,
+    scope: getPlanScope(row.church_id == null ? null : String(row.church_id), row.team_id == null ? null : String(row.team_id)),
   });
 }
 
@@ -433,7 +441,7 @@ async function hasRemoteRows(userId: string): Promise<boolean> {
     supabase.from(USER_BIBLE_STATE_TABLE).select("user_id").eq("user_id", userId).limit(1),
     supabase.from(USER_FAVORITES_TABLE).select("verse").eq("user_id", userId).limit(1),
     supabase.from(USER_MEMOS_TABLE).select("id").eq("user_id", userId).limit(1),
-    supabase.from(USER_PLANS_TABLE).select("id").eq("user_id", userId).limit(1),
+    supabase.from(USER_PLANS_TABLE).select("id").eq("user_id", userId).is("church_id", null).limit(1),
     supabase.from(USER_PRAYERS_TABLE).select("id").eq("user_id", userId).limit(1),
     supabase.from(USER_GRASS_TABLE).select("date").eq("user_id", userId).limit(1),
   ]);
@@ -532,7 +540,7 @@ async function replaceMemos(userId: string, memos: MemoRecord[]): Promise<void> 
 
 async function replacePlans(userId: string, plans: PlanRecord[]): Promise<void> {
   const supabase = createBrowserSupabaseClient();
-  const { error: deleteError } = await supabase.from(USER_PLANS_TABLE).delete().eq("user_id", userId);
+  const { error: deleteError } = await supabase.from(USER_PLANS_TABLE).delete().eq("user_id", userId).is("church_id", null);
   if (deleteError) throwSupabaseError(deleteError);
 
   if (!plans.length) return;
@@ -552,6 +560,8 @@ async function replacePlans(userId: string, plans: PlanRecord[]): Promise<void> 
     selected_book_codes: plan.selectedBookCodes,
     created_at: plan.createdAt,
     updated_at: plan.updatedAt,
+    church_id: null,
+    team_id: null,
   }));
 
   const { error } = await supabase.from(USER_PLANS_TABLE).insert(payload);
@@ -735,9 +745,10 @@ export async function loadPersistedSlicesFromSupabase(
       ? supabase
           .from(USER_PLANS_TABLE)
           .select(
-            "id, client_id, plan_name, start_date, end_date, total_read_count, current_read_count, goal_percent, read_count_per_day, rest_day, goal_status, selected_book_codes, created_at, updated_at",
+            "id, user_id, client_id, plan_name, start_date, end_date, total_read_count, current_read_count, goal_percent, read_count_per_day, rest_day, goal_status, selected_book_codes, created_at, updated_at, church_id, team_id",
           )
           .eq("user_id", userId)
+          .is("church_id", null)
           .order("created_at", { ascending: false })
           .order("id", { ascending: false })
       : Promise.resolve(null),

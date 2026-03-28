@@ -1,6 +1,6 @@
 "use client";
 
-import { BookOpenText, Settings, UserRound } from "lucide-react";
+import { BookOpenText, Building2, Settings, UserRound } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -9,6 +9,7 @@ import { useI18n } from "@/utils/i18n";
 
 const items = [
   { href: "/", key: "tabs.bible", icon: BookOpenText },
+  { href: "/churches", key: "tabs.church", icon: Building2 },
   { href: "/mypage", key: "tabs.mypage", icon: UserRound },
   { href: "/settings", key: "tabs.settings", icon: Settings },
 ];
@@ -20,7 +21,7 @@ export function TabBar() {
   return (
     <nav className="fixed inset-x-0 bottom-0 z-30 flex justify-center px-3 pb-[max(env(safe-area-inset-bottom),0px)] sm:bottom-6 sm:px-4">
       <div className="w-full max-w-[28rem] border-t border-base-300 bg-base-100/95 px-3 py-3 backdrop-blur sm:rounded-[1.75rem] sm:border sm:shadow-2xl sm:shadow-stone-950/10">
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-4 gap-2">
           {items.map((item) => {
             const active = pathname === item.href;
             const Icon = item.icon;

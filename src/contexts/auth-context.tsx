@@ -13,6 +13,7 @@ import {
 } from "react";
 
 import { getActiveUserId, setActiveUserId } from "@/lib/auth-state";
+import { syncUserProfileFromAuthUser } from "@/lib/church";
 import { pausePersistedStateSync, resumePersistedStateSync } from "@/lib/persist-sync-control";
 import { bootstrapSupabaseUserData, clearLoadedPersistedSlices, markPersistedSlicesLoaded } from "@/lib/supabase-store";
 import { createBrowserSupabaseClient } from "@/lib/supabase-browser";
@@ -88,6 +89,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const localSnapshot = getLocalPersistedSnapshot();
         await bootstrapSupabaseUserData(user.id, localSnapshot);
+        await syncUserProfileFromAuthUser(user);
         setActiveUserId(user.id);
         await rehydratePersistedStore();
         if (!mountedRef.current) return;

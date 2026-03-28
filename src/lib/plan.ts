@@ -4,6 +4,7 @@ import { formatDate, todayString } from "@/lib/date";
 export const BIBLE_BOOKS = bibleInfos.filter((book) => book.bookSeq >= 1 && book.bookSeq <= 66);
 
 export type GoalStatus = number[][];
+export type PlanScope = "personal" | "church" | "team";
 
 export type PlanRecord = {
   id: string;
@@ -19,10 +20,20 @@ export type PlanRecord = {
   selectedBookCodes: string[];
   createdAt: string;
   updatedAt: string;
+  churchId: string | null;
+  teamId: string | null;
+  createdByUserId: string | null;
+  scope: PlanScope;
 };
 
 export function createEmptyGoalStatus(): GoalStatus {
   return BIBLE_BOOKS.map((book) => Array(book.maxChapter).fill(0));
+}
+
+export function getPlanScope(churchId?: string | null, teamId?: string | null): PlanScope {
+  if (teamId) return "team";
+  if (churchId) return "church";
+  return "personal";
 }
 
 export function calcTotalReadCount(selectedBookCodes: string[]): number {
@@ -85,6 +96,11 @@ export function createInitialPlan(
   endDate: string,
   selectedBookCodes: string[],
   createdAt: string,
+  metadata?: {
+    churchId?: string | null;
+    teamId?: string | null;
+    createdByUserId?: string | null;
+  },
 ): PlanRecord {
   const goalStatus = createEmptyGoalStatus();
   return {
@@ -96,6 +112,10 @@ export function createInitialPlan(
     selectedBookCodes,
     createdAt,
     updatedAt: createdAt,
+    churchId: metadata?.churchId ?? null,
+    teamId: metadata?.teamId ?? null,
+    createdByUserId: metadata?.createdByUserId ?? null,
+    scope: getPlanScope(metadata?.churchId ?? null, metadata?.teamId ?? null),
     ...recalcPlanFields(goalStatus, selectedBookCodes, endDate),
   };
 }

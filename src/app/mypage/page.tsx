@@ -1,6 +1,6 @@
 "use client";
 
-import { BookHeart, BookOpenCheck, ChevronRight, NotebookText, Sparkles } from "lucide-react";
+import { BookHeart, BookOpenCheck, Building2, ChevronRight, NotebookText, Sparkles } from "lucide-react";
 import Link from "next/link";
 
 import { BibleGrass } from "@/components/mypage/bible-grass";
@@ -49,6 +49,7 @@ export default function MyPageScreen() {
           <MenuCard href="/memos" title={t("mypage.memosMenu")} icon={<NotebookText className="size-5 text-amber-600" />} />
           <MenuCard href="/prayers" title={t("mypage.prayersMenu")} icon={<Sparkles className="size-5 text-indigo-500" />} />
           <MenuCard href="/plans" title={t("mypage.plansMenu")} icon={<BookOpenCheck className="size-5 text-emerald-600" />} />
+          <MenuCard href="/churches" title={t("church.title")} icon={<Building2 className="size-5 text-sky-600" />} />
         </div>
       </div>
     </div>

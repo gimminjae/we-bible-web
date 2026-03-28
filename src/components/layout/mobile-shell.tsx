@@ -10,7 +10,7 @@ import { useHeaderContext } from "@/contexts/header-context";
 import { useHydrated } from "@/hooks/use-hydrated";
 import { useAppStore } from "@/store/app-store";
 
-const TAB_PATHS = new Set(["/", "/mypage", "/settings"]);
+const TAB_PATHS = new Set(["/", "/churches", "/mypage", "/settings"]);
 
 export function MobileShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
