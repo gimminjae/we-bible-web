@@ -5,7 +5,7 @@ import { persist } from "zustand/middleware";
 
 import type { BibleLang, FavoriteVerseRecord } from "@/components/bible/types";
 import { createId, formatDateTime, todayString } from "@/lib/date";
-import { type GrassColorTheme, type GrassDataMap, fillGrassByPoint, syncGrassFromPlanSave } from "@/lib/grass";
+import { type GrassColorTheme, type GrassDataMap, fillGrassByPoint, syncGrassFromGoalStatusSave } from "@/lib/grass";
 import { type GoalStatus, type PlanRecord, createInitialPlan, updatePlanComputedFields } from "@/lib/plan";
 import { createAppPersistStorage } from "@/lib/app-persist-storage";
 
@@ -101,8 +101,13 @@ type AppStore = PersistedState & {
   updatePlanGoalStatus: (
     id: string,
     goalStatus: GoalStatus,
-    options?: { bookCode?: string; previousStatus?: number[]; nextStatus?: number[] },
+    options?: { selectedBookCodes?: string[]; previousGoalStatus?: GoalStatus },
   ) => void;
+  syncPlanGoalStatusToGrass: (args: {
+    selectedBookCodes: string[];
+    previousGoalStatus: GoalStatus;
+    nextGoalStatus: GoalStatus;
+  }) => void;
   deletePlan: (id: string) => void;
   setGrassTheme: (theme: GrassColorTheme) => void;
   markStepRewardUsed: (dateKey: string) => void;
@@ -365,15 +370,29 @@ export const useAppStore = create<AppStore>()(
               : plan,
           );
 
-          if (!options?.bookCode || !options.previousStatus || !options.nextStatus) {
+          if (!options?.selectedBookCodes || !options.previousGoalStatus) {
             return { plans: nextPlans };
           }
 
           return {
             plans: nextPlans,
-            grassData: syncGrassFromPlanSave(state.grassData, options.bookCode, options.previousStatus, options.nextStatus),
+            grassData: syncGrassFromGoalStatusSave(
+              state.grassData,
+              options.selectedBookCodes,
+              options.previousGoalStatus,
+              goalStatus,
+            ),
           };
         }),
+      syncPlanGoalStatusToGrass: ({ selectedBookCodes, previousGoalStatus, nextGoalStatus }) =>
+        set((state) => ({
+          grassData: syncGrassFromGoalStatusSave(
+            state.grassData,
+            selectedBookCodes,
+            previousGoalStatus,
+            nextGoalStatus,
+          ),
+        })),
       deletePlan: (id) =>
         set((state) => ({
           plans: state.plans.filter((plan) => plan.id !== id),

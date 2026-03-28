@@ -8,9 +8,11 @@ import { useCallback, useMemo, useState } from "react";
 import { ChurchRoleBadge } from "@/components/churches/role-badge";
 import { SharedPlanProgressSheet } from "@/components/churches/shared-plan-progress-sheet";
 import { LoadingScreen } from "@/components/ui/loading-screen";
+import { useBibleGrass } from "@/hooks/use-bible-grass";
 import { useChurchActions, useSharedPlanDetail } from "@/hooks/use-churches";
 import { useHeader } from "@/hooks/use-header";
 import { useToast } from "@/hooks/use-toast";
+import { useAppStore } from "@/store/app-store";
 import { useI18n } from "@/utils/i18n";
 
 export default function ChurchPlanDetailPage() {
@@ -19,7 +21,9 @@ export default function ChurchPlanDetailPage() {
   const { t } = useI18n();
   const { showToast } = useToast();
   const { sharedPlanDetail, isLoading, error } = useSharedPlanDetail(params.id, params.planId);
+  const { isLoading: isGrassLoading, error: grassError } = useBibleGrass();
   const { deleteSharedPlan, updateSharedPlanProgress } = useChurchActions();
+  const syncPlanGoalStatusToGrass = useAppStore((state) => state.syncPlanGoalStatusToGrass);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const planTitle = sharedPlanDetail?.summary.planName ?? t("church.planDetailTitle");
   const canEditPlan = Boolean(sharedPlanDetail?.canEditPlan);
@@ -71,15 +75,17 @@ export default function ChurchPlanDetailPage() {
     [selectedUserId, sharedPlanDetail],
   );
 
-  if (error) {
-    if (error.message === "CHURCH_NOT_FOUND" || error.message === "PLAN_NOT_FOUND") {
+  const loadErrorMessage = error?.message ?? grassError ?? null;
+
+  if (loadErrorMessage) {
+    if (loadErrorMessage === "CHURCH_NOT_FOUND" || loadErrorMessage === "PLAN_NOT_FOUND") {
       notFound();
     }
 
-    return <LoadingScreen message={error.message} />;
+    return <LoadingScreen message={loadErrorMessage} />;
   }
 
-  if (isLoading) {
+  if (isLoading || isGrassLoading) {
     return <LoadingScreen message="Loading plan..." />;
   }
 
@@ -165,12 +171,18 @@ export default function ChurchPlanDetailPage() {
           }
 
           try {
+            const previousGoalStatus = selectedMemberProgress.plan.goalStatus.map((row) => [...row]);
             await updateSharedPlanProgress({
               churchId: params.id,
               planId: params.planId,
               endDate: sharedPlanDetail.summary.endDate,
               selectedBookCodes: sharedPlanDetail.summary.selectedBookCodes,
               goalStatus,
+            });
+            syncPlanGoalStatusToGrass({
+              selectedBookCodes: sharedPlanDetail.summary.selectedBookCodes,
+              previousGoalStatus,
+              nextGoalStatus: goalStatus,
             });
             showToast(t("toast.churchPlanProgressUpdated"));
           } catch (saveError) {

@@ -146,6 +146,11 @@ export type SharedPlanDetail = {
   canUpdateMyProgress: boolean;
 };
 
+export type MySharedPlanSummary = SharedPlanSummary & {
+  churchName: string;
+  teamName: string | null;
+};
+
 type UserProfileRow = {
   user_id: string;
   display_name: string | null;
@@ -447,6 +452,101 @@ export async function fetchMyChurches(userId: string): Promise<ChurchSummary[]> 
       };
     })
     .sort((left, right) => left.name.localeCompare(right.name, "ko"));
+}
+
+export async function fetchMySharedPlans(currentUserId: string): Promise<MySharedPlanSummary[]> {
+  const supabase = createBrowserSupabaseClient();
+  const { data: membershipData, error: membershipError } = await supabase
+    .from("church_memberships")
+    .select("church_id, user_id, role, team_id, joined_at, updated_at")
+    .eq("user_id", currentUserId);
+
+  if (membershipError) throw membershipError;
+
+  const memberships = (membershipData ?? []) as MembershipRow[];
+  if (!memberships.length) return [];
+
+  const churchIds = [...new Set(memberships.map((membership) => membership.church_id))];
+  const [{ data: churchData, error: churchError }, { data: planData, error: planError }] = await Promise.all([
+    supabase
+      .from("churches")
+      .select("id, name, created_at, updated_at, created_by_user_id, super_admin_user_id, member_count, deputy_admin_user_ids")
+      .in("id", churchIds),
+    supabase
+      .from("plans")
+      .select("id, user_id, plan_name, start_date, end_date, selected_book_codes, created_at, updated_at, church_id, team_id")
+      .in("church_id", churchIds)
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false }),
+  ]);
+
+  if (churchError) throw churchError;
+  if (planError) throw planError;
+
+  const candidatePlans = (planData ?? []) as SharedPlanRow[];
+  if (!candidatePlans.length) return [];
+
+  const candidatePlanIds = candidatePlans.map((plan) => plan.id);
+  const { data: myProgressData, error: myProgressError } = await supabase
+    .from("plan_progresses")
+    .select("plan_id, user_id, goal_status, current_read_count, goal_percent, read_count_per_day, rest_day, created_at, updated_at")
+    .eq("user_id", currentUserId)
+    .in("plan_id", candidatePlanIds);
+
+  if (myProgressError) throw myProgressError;
+
+  const myProgressRows = (myProgressData ?? []) as PlanProgressRow[];
+  const myAccessiblePlanIds = new Set(myProgressRows.map((row) => row.plan_id));
+  const accessiblePlans = candidatePlans.filter((plan) => myAccessiblePlanIds.has(plan.id));
+
+  if (!accessiblePlans.length) return [];
+
+  const accessiblePlanIds = accessiblePlans.map((plan) => plan.id);
+  const teamIds = [...new Set(accessiblePlans.map((plan) => plan.team_id).filter((value): value is number => value != null))];
+  const createdByUserIds = [...new Set(accessiblePlans.map((plan) => plan.user_id).filter((value): value is string => Boolean(value)))];
+
+  const [
+    { data: progressData, error: progressError },
+    teamResult,
+    profileMap,
+  ] = await Promise.all([
+    supabase
+      .from("plan_progresses")
+      .select("plan_id, user_id, goal_status, current_read_count, goal_percent, read_count_per_day, rest_day, created_at, updated_at")
+      .in("plan_id", accessiblePlanIds),
+    teamIds.length
+      ? supabase.from("teams").select("id, church_id, name, created_at, updated_at, created_by_user_id, leader_user_id").in("id", teamIds)
+      : Promise.resolve({ data: [], error: null }),
+    fetchProfilesForUserIds(createdByUserIds),
+  ]);
+
+  if (progressError) throw progressError;
+  if (teamResult.error) throw teamResult.error;
+
+  const churchMap = new Map(((churchData ?? []) as ChurchRow[]).map((church) => [church.id, church]));
+  const teamMap = new Map(((teamResult.data ?? []) as TeamRow[]).map((team) => [team.id, team]));
+  const progressMap = new Map<number, PlanProgressRow[]>();
+
+  for (const row of (progressData ?? []) as PlanProgressRow[]) {
+    const existing = progressMap.get(row.plan_id);
+    if (existing) existing.push(row);
+    else progressMap.set(row.plan_id, [row]);
+  }
+
+  return accessiblePlans.map((plan) => {
+    const summary = summarizeSharedPlan({
+      planRow: plan,
+      progressRows: progressMap.get(plan.id) ?? [],
+      currentUserId,
+      profileMap,
+    });
+
+    return {
+      ...summary,
+      churchName: churchMap.get(plan.church_id ?? -1)?.name ?? "",
+      teamName: plan.team_id == null ? null : teamMap.get(plan.team_id)?.name ?? null,
+    };
+  });
 }
 
 export async function searchChurches(userId: string, searchTerm: string): Promise<ChurchSearchResult[]> {

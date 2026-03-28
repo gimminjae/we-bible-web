@@ -123,7 +123,7 @@ export function SharedPlanProgressSheet({
                         <button
                           key={chapterIndex}
                           type="button"
-                          className={`btn btn-xs rounded-full ${read ? "btn-success" : "btn-outline"}`}
+                          className={`btn btn-xs size-8 rounded-xl p-0 ${read ? "btn-success" : "btn-outline"}`}
                           disabled={!canEdit}
                           onClick={() =>
                             canEdit

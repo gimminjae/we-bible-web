@@ -12,6 +12,7 @@ export function usePlans() {
   const addPlan = useAppStore((state) => state.addPlan);
   const updatePlanInfo = useAppStore((state) => state.updatePlanInfo);
   const updatePlanGoalStatus = useAppStore((state) => state.updatePlanGoalStatus);
+  const syncPlanGoalStatusToGrass = useAppStore((state) => state.syncPlanGoalStatusToGrass);
   const deletePlan = useAppStore((state) => state.deletePlan);
 
   return {
@@ -19,6 +20,7 @@ export function usePlans() {
     addPlan,
     updatePlanInfo,
     updatePlanGoalStatus,
+    syncPlanGoalStatusToGrass,
     deletePlan,
     isLoading,
     error,

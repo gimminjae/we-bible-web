@@ -144,7 +144,7 @@ export default function PlanDetailPage() {
                         <button
                           key={chapter}
                           type="button"
-                          className={`btn btn-xs rounded-full ${read ? "btn-success" : "btn-outline"}`}
+                          className={`btn btn-xs size-8 rounded-xl p-0 ${read ? "btn-success" : "btn-outline"}`}
                           onClick={() => openBookEditor(book.bookCode)}
                         >
                           {chapter}
@@ -174,7 +174,7 @@ export default function PlanDetailPage() {
                   <button
                     key={chapterIndex}
                     type="button"
-                    className={`btn btn-sm rounded-full ${read ? "btn-success" : "btn-outline"}`}
+                    className={`btn btn-sm size-10 rounded-xl p-0 ${read ? "btn-success" : "btn-outline"}`}
                     onClick={() =>
                       setLocalStatus((previous) => previous.map((value, index) => (index === chapterIndex ? (value === 1 ? 0 : 1) : value)))
                     }
@@ -191,12 +191,11 @@ export default function PlanDetailPage() {
                 className="btn btn-primary"
                 onClick={() => {
                   const bookIndex = selectedBookIndex!;
-                  const previousStatus = [...(currentPlan.goalStatus[bookIndex] ?? [])];
+                  const previousGoalStatus = currentPlan.goalStatus.map((item) => [...item]);
                   const nextGoalStatus = currentPlan.goalStatus.map((item, index) => (index === bookIndex ? [...localStatus] : item));
                   updatePlanGoalStatus(currentPlan.id, nextGoalStatus, {
-                    bookCode: selectedBook.bookCode,
-                    previousStatus,
-                    nextStatus: [...localStatus],
+                    selectedBookCodes: currentPlan.selectedBookCodes,
+                    previousGoalStatus,
                   });
                   showToast(t("toast.planUpdated"));
                   bookEditorDrawer.close();

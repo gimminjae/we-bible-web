@@ -1,3 +1,5 @@
+import { BIBLE_BOOKS, type GoalStatus } from "@/lib/plan";
+
 export type GrassColorTheme = "green" | "yellow" | "orange" | "red" | "blue" | "purple" | "sky";
 
 export type GrassDayEntry = {
@@ -88,6 +90,28 @@ export function syncGrassFromPlanSave(
       fillYn: nextEntries.length > 0 ? false : existingDay.fillYn,
     },
   };
+}
+
+export function syncGrassFromGoalStatusSave(
+  grassData: GrassDataMap,
+  selectedBookCodes: string[],
+  previousGoalStatus: GoalStatus,
+  nextGoalStatus: GoalStatus,
+): GrassDataMap {
+  const selectedBookCodeSet = new Set(selectedBookCodes);
+
+  return BIBLE_BOOKS.reduce((currentGrassData, book, bookIndex) => {
+    const previousStatus = previousGoalStatus[bookIndex] ?? [];
+    const nextStatus = nextGoalStatus[bookIndex] ?? [];
+    const hasPreviousRead = previousStatus.some((value) => value === 1);
+    const hasNextRead = nextStatus.some((value) => value === 1);
+
+    if (!selectedBookCodeSet.has(book.bookCode) && !hasPreviousRead && !hasNextRead) {
+      return currentGrassData;
+    }
+
+    return syncGrassFromPlanSave(currentGrassData, book.bookCode, previousStatus, nextStatus);
+  }, grassData);
 }
 
 export function fillGrassByPoint(grassData: GrassDataMap, date: string): { grassData: GrassDataMap; filled: boolean } {

@@ -12,6 +12,7 @@ import {
   deleteSharedPlan,
   fetchChurchDetail,
   fetchMyChurches,
+  fetchMySharedPlans,
   fetchSharedPlanDetail,
   removeChurchMember,
   rejectChurchJoinRequest,
@@ -29,6 +30,7 @@ import type { GoalStatus } from "@/lib/plan";
 const churchKeys = {
   all: ["churches"] as const,
   my: (userId: string) => ["churches", "my", userId] as const,
+  mySharedPlans: (userId: string) => ["churches", "my-shared-plans", userId] as const,
   search: (userId: string, keyword: string) => ["churches", "search", userId, keyword] as const,
   detail: (churchId: string, userId: string) => ["churches", "detail", churchId, userId] as const,
   plan: (churchId: string, planId: string, userId: string) => ["churches", "plan", churchId, planId, userId] as const,
@@ -67,6 +69,20 @@ export function useChurchSearch(keyword: string) {
 
   return {
     churches: query.data ?? [],
+    ...query,
+  };
+}
+
+export function useMySharedPlans() {
+  const { dataUserId, isConfigured } = useAuth();
+  const query = useCustomQuery({
+    queryKey: dataUserId ? churchKeys.mySharedPlans(dataUserId) : ["churches", "my-shared-plans", "guest"],
+    queryFn: () => fetchMySharedPlans(requireUserId(dataUserId)),
+    enabled: Boolean(isConfigured && dataUserId),
+  });
+
+  return {
+    sharedPlans: query.data ?? [],
     ...query,
   };
 }
