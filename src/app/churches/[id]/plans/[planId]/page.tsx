@@ -3,7 +3,7 @@
 import { Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { notFound, useParams, useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import { ChurchRoleBadge } from "@/components/churches/role-badge";
 import { SharedPlanProgressSheet } from "@/components/churches/shared-plan-progress-sheet";
@@ -21,41 +21,49 @@ export default function ChurchPlanDetailPage() {
   const { sharedPlanDetail, isLoading, error } = useSharedPlanDetail(params.id, params.planId);
   const { deleteSharedPlan, updateSharedPlanProgress } = useChurchActions();
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const planTitle = sharedPlanDetail?.summary.planName ?? t("church.planDetailTitle");
+  const canEditPlan = Boolean(sharedPlanDetail?.canEditPlan);
+
+  const handleDeletePlan = useCallback(async () => {
+    try {
+      await deleteSharedPlan({
+        churchId: params.id,
+        planId: params.planId,
+      });
+      showToast(t("toast.churchPlanDeleted"));
+      router.replace(`/churches/${params.id}`);
+    } catch (deleteError) {
+      showToast(deleteError instanceof Error ? deleteError.message : t("church.planDeleteFailed"));
+    }
+  }, [deleteSharedPlan, params.id, params.planId, router, showToast, t]);
+
+  const headerActions = useMemo(() => {
+    if (!canEditPlan) {
+      return null;
+    }
+
+    return (
+      <>
+        <Link href={`/churches/${params.id}/plans/${params.planId}/edit`} className="btn btn-sm btn-primary">
+          <Pencil className="size-4" />
+          {t("mypage.editPlan")}
+        </Link>
+        <button type="button" className="btn btn-sm btn-error" onClick={handleDeletePlan}>
+          <Trash2 className="size-4" />
+          {t("mypage.deletePlan")}
+        </button>
+      </>
+    );
+  }, [canEditPlan, handleDeletePlan, params.id, params.planId, t]);
 
   useHeader(
     () => ({
-      title: sharedPlanDetail?.summary.planName ?? t("church.planDetailTitle"),
+      title: planTitle,
       eyebrow: t("common.back"),
       showBack: true,
-      actions: sharedPlanDetail?.canEditPlan ? (
-        <>
-          <Link href={`/churches/${params.id}/plans/${params.planId}/edit`} className="btn btn-sm btn-primary">
-            <Pencil className="size-4" />
-            {t("mypage.editPlan")}
-          </Link>
-          <button
-            type="button"
-            className="btn btn-sm btn-error"
-            onClick={async () => {
-              try {
-                await deleteSharedPlan({
-                  churchId: params.id,
-                  planId: params.planId,
-                });
-                showToast(t("toast.churchPlanDeleted"));
-                router.replace(`/churches/${params.id}`);
-              } catch (deleteError) {
-                showToast(deleteError instanceof Error ? deleteError.message : t("church.planDeleteFailed"));
-              }
-            }}
-          >
-            <Trash2 className="size-4" />
-            {t("mypage.deletePlan")}
-          </button>
-        </>
-      ) : null,
+      actions: headerActions,
     }),
-    [deleteSharedPlan, params.id, params.planId, router, sharedPlanDetail, showToast, t],
+    [headerActions, planTitle, t],
   );
 
   const selectedMemberProgress = useMemo(

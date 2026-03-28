@@ -1,6 +1,7 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
+import { useMemo } from "react";
 
 import { useAuth } from "@/contexts/auth-context";
 import {
@@ -102,132 +103,134 @@ export function useChurchActions() {
   const queryClient = useQueryClient();
   const { dataUserId } = useAuth();
 
-  async function invalidateChurchQueries(churchId?: string, planId?: string) {
-    await queryClient.invalidateQueries({ queryKey: churchKeys.all });
+  return useMemo(() => {
+    async function invalidateChurchQueries(churchId?: string, planId?: string) {
+      await queryClient.invalidateQueries({ queryKey: churchKeys.all });
 
-    if (churchId && dataUserId) {
-      await queryClient.invalidateQueries({ queryKey: churchKeys.detail(churchId, dataUserId) });
+      if (churchId && dataUserId) {
+        await queryClient.invalidateQueries({ queryKey: churchKeys.detail(churchId, dataUserId) });
+      }
+
+      if (churchId && planId && dataUserId) {
+        await queryClient.invalidateQueries({ queryKey: churchKeys.plan(churchId, planId, dataUserId) });
+      }
     }
 
-    if (churchId && planId && dataUserId) {
-      await queryClient.invalidateQueries({ queryKey: churchKeys.plan(churchId, planId, dataUserId) });
-    }
-  }
-
-  return {
-    async createChurch(name: string) {
-      const churchId = await createChurch(name);
-      await invalidateChurchQueries(churchId);
-      return churchId;
-    },
-    async requestJoin(churchId: string) {
-      await requestChurchJoin(churchId, requireUserId(dataUserId));
-      await invalidateChurchQueries(churchId);
-    },
-    async approveJoinRequest(args: { requestId: string; churchId: string; requesterUserId: string; teamId?: string | null }) {
-      await approveChurchJoinRequest({
-        requestId: args.requestId,
-        churchId: args.churchId,
-        requesterUserId: args.requesterUserId,
-        approvedByUserId: requireUserId(dataUserId),
-        teamId: args.teamId ?? null,
-      });
-      await invalidateChurchQueries(args.churchId);
-    },
-    async rejectJoinRequest(args: { requestId: string; churchId: string }) {
-      await rejectChurchJoinRequest({
-        requestId: args.requestId,
-        processedByUserId: requireUserId(dataUserId),
-      });
-      await invalidateChurchQueries(args.churchId);
-    },
-    async updateMemberRole(args: { churchId: string; userId: string; role: "super_admin" | "deputy_admin" | "member" }) {
-      await updateChurchMemberRole(args);
-      await invalidateChurchQueries(args.churchId);
-    },
-    async updateMemberTeam(args: { churchId: string; userId: string; teamId?: string | null }) {
-      await updateChurchMemberTeam(args);
-      await invalidateChurchQueries(args.churchId);
-    },
-    async updateTeamLeader(args: { churchId: string; teamId: string; leaderUserId?: string | null }) {
-      await updateTeamLeader({
-        teamId: args.teamId,
-        leaderUserId: args.leaderUserId ?? null,
-      });
-      await invalidateChurchQueries(args.churchId);
-    },
-    async removeMember(args: { churchId: string; userId: string }) {
-      await removeChurchMember(args);
-      await invalidateChurchQueries(args.churchId);
-    },
-    async leaveChurch(churchId: string) {
-      const userId = requireUserId(dataUserId);
-      await removeChurchMember({
-        churchId,
-        userId,
-      });
-      await invalidateChurchQueries(churchId);
-    },
-    async createTeam(args: { churchId: string; name: string; leaderUserId?: string | null }) {
-      const teamId = await createTeam({
-        churchId: args.churchId,
-        name: args.name,
-        leaderUserId: args.leaderUserId ?? null,
-        createdByUserId: requireUserId(dataUserId),
-      });
-      await invalidateChurchQueries(args.churchId);
-      return teamId;
-    },
-    async createSharedPlan(args: {
-      churchId: string;
-      teamId?: string | null;
-      planName: string;
-      startDate: string;
-      endDate: string;
-      selectedBookCodes: string[];
-    }) {
-      const planId = await createSharedPlan({
-        churchId: args.churchId,
-        teamId: args.teamId ?? null,
-        currentUserId: requireUserId(dataUserId),
-        planName: args.planName,
-        startDate: args.startDate,
-        endDate: args.endDate,
-        selectedBookCodes: args.selectedBookCodes,
-      });
-      await invalidateChurchQueries(args.churchId, planId);
-      return planId;
-    },
-    async updateSharedPlan(args: {
-      churchId: string;
-      planId: string;
-      planName: string;
-      startDate: string;
-      endDate: string;
-      selectedBookCodes: string[];
-    }) {
-      await updateSharedPlan(args);
-      await invalidateChurchQueries(args.churchId, args.planId);
-    },
-    async deleteSharedPlan(args: { churchId: string; planId: string }) {
-      await deleteSharedPlan(args.planId);
-      await invalidateChurchQueries(args.churchId, args.planId);
-    },
-    async updateSharedPlanProgress(args: {
-      churchId: string;
-      planId: string;
-      endDate: string;
-      selectedBookCodes: string[];
-      goalStatus: GoalStatus;
-    }) {
-      await updateSharedPlanProgress({
-        planId: args.planId,
-        userId: requireUserId(dataUserId),
-        endDate: args.endDate,
-        selectedBookCodes: args.selectedBookCodes,
-        goalStatus: args.goalStatus,
-      });
-      await invalidateChurchQueries(args.churchId, args.planId);
-    },
-  };
+    return {
+      async createChurch(name: string) {
+        const churchId = await createChurch(name);
+        await invalidateChurchQueries(churchId);
+        return churchId;
+      },
+      async requestJoin(churchId: string) {
+        await requestChurchJoin(churchId, requireUserId(dataUserId));
+        await invalidateChurchQueries(churchId);
+      },
+      async approveJoinRequest(args: { requestId: string; churchId: string; requesterUserId: string; teamId?: string | null }) {
+        await approveChurchJoinRequest({
+          requestId: args.requestId,
+          churchId: args.churchId,
+          requesterUserId: args.requesterUserId,
+          approvedByUserId: requireUserId(dataUserId),
+          teamId: args.teamId ?? null,
+        });
+        await invalidateChurchQueries(args.churchId);
+      },
+      async rejectJoinRequest(args: { requestId: string; churchId: string }) {
+        await rejectChurchJoinRequest({
+          requestId: args.requestId,
+          processedByUserId: requireUserId(dataUserId),
+        });
+        await invalidateChurchQueries(args.churchId);
+      },
+      async updateMemberRole(args: { churchId: string; userId: string; role: "super_admin" | "deputy_admin" | "member" }) {
+        await updateChurchMemberRole(args);
+        await invalidateChurchQueries(args.churchId);
+      },
+      async updateMemberTeam(args: { churchId: string; userId: string; teamId?: string | null }) {
+        await updateChurchMemberTeam(args);
+        await invalidateChurchQueries(args.churchId);
+      },
+      async updateTeamLeader(args: { churchId: string; teamId: string; leaderUserId?: string | null }) {
+        await updateTeamLeader({
+          teamId: args.teamId,
+          leaderUserId: args.leaderUserId ?? null,
+        });
+        await invalidateChurchQueries(args.churchId);
+      },
+      async removeMember(args: { churchId: string; userId: string }) {
+        await removeChurchMember(args);
+        await invalidateChurchQueries(args.churchId);
+      },
+      async leaveChurch(churchId: string) {
+        const userId = requireUserId(dataUserId);
+        await removeChurchMember({
+          churchId,
+          userId,
+        });
+        await invalidateChurchQueries(churchId);
+      },
+      async createTeam(args: { churchId: string; name: string; leaderUserId?: string | null }) {
+        const teamId = await createTeam({
+          churchId: args.churchId,
+          name: args.name,
+          leaderUserId: args.leaderUserId ?? null,
+          createdByUserId: requireUserId(dataUserId),
+        });
+        await invalidateChurchQueries(args.churchId);
+        return teamId;
+      },
+      async createSharedPlan(args: {
+        churchId: string;
+        teamId?: string | null;
+        planName: string;
+        startDate: string;
+        endDate: string;
+        selectedBookCodes: string[];
+      }) {
+        const planId = await createSharedPlan({
+          churchId: args.churchId,
+          teamId: args.teamId ?? null,
+          currentUserId: requireUserId(dataUserId),
+          planName: args.planName,
+          startDate: args.startDate,
+          endDate: args.endDate,
+          selectedBookCodes: args.selectedBookCodes,
+        });
+        await invalidateChurchQueries(args.churchId, planId);
+        return planId;
+      },
+      async updateSharedPlan(args: {
+        churchId: string;
+        planId: string;
+        planName: string;
+        startDate: string;
+        endDate: string;
+        selectedBookCodes: string[];
+      }) {
+        await updateSharedPlan(args);
+        await invalidateChurchQueries(args.churchId, args.planId);
+      },
+      async deleteSharedPlan(args: { churchId: string; planId: string }) {
+        await deleteSharedPlan(args.planId);
+        await invalidateChurchQueries(args.churchId, args.planId);
+      },
+      async updateSharedPlanProgress(args: {
+        churchId: string;
+        planId: string;
+        endDate: string;
+        selectedBookCodes: string[];
+        goalStatus: GoalStatus;
+      }) {
+        await updateSharedPlanProgress({
+          planId: args.planId,
+          userId: requireUserId(dataUserId),
+          endDate: args.endDate,
+          selectedBookCodes: args.selectedBookCodes,
+          goalStatus: args.goalStatus,
+        });
+        await invalidateChurchQueries(args.churchId, args.planId);
+      },
+    };
+  }, [dataUserId, queryClient]);
 }
