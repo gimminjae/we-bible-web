@@ -3,15 +3,17 @@
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
-import { ChevronDown, GoogleBrand, KakaoBrand, Languages, Loader2, LogIn, LogOut, Moon, Sun, UserPlus } from "@/components/icons";
+import { Check, ChevronDown, GoogleBrand, KakaoBrand, Languages, Loader2, LogIn, LogOut, Moon, Pencil, Sun, UserPlus } from "@/components/icons";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { useAuth } from "@/contexts/auth-context";
 import { useAppSettings } from "@/contexts/app-settings";
 import { useDrawer } from "@/hooks/use-drawer";
 import { useHeader } from "@/hooks/use-header";
+import { fetchUserProfile, updateMyDisplayName } from "@/lib/church";
 import {
   getOAuthRedirectTo,
   getUserAccountLabel,
+  getUserDisplayName,
   getUserProvider,
   type SocialProvider,
 } from "@/lib/supabase";
@@ -23,6 +25,10 @@ const LANGUAGE_OPTIONS = [
   { value: "ko", label: "한국어" },
   { value: "en", label: "English" },
 ] as const;
+
+function isValidDisplayName(displayName: string) {
+  return /^[A-Za-z0-9가-힣._-]{2,20}$/.test(displayName.trim());
+}
 
 function isValidEmail(email: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -37,6 +43,7 @@ export default function SettingsPage() {
   const { t } = useI18n();
   const { showToast } = useToast();
   const languagePickerDrawer = useDrawer();
+  const displayNameDrawer = useDrawer();
   const router = useRouter();
   const searchParams = useSearchParams();
   const {
@@ -56,6 +63,10 @@ export default function SettingsPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [displayNameInput, setDisplayNameInput] = useState("");
+  const [isLoadingDisplayName, setIsLoadingDisplayName] = useState(false);
+  const [isUpdatingDisplayName, setIsUpdatingDisplayName] = useState(false);
 
   useHeader(
     () => ({
@@ -84,6 +95,47 @@ export default function SettingsPage() {
     showToast(lastError);
     clearLastError();
   }, [clearLastError, lastError, showToast]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadDisplayName = async () => {
+      if (!isConfigured || !currentUser) {
+        const fallbackDisplayName = getUserDisplayName(currentUser) ?? "";
+        if (!cancelled) {
+          setDisplayName(fallbackDisplayName);
+          setDisplayNameInput(fallbackDisplayName);
+          setIsLoadingDisplayName(false);
+        }
+        return;
+      }
+
+      setIsLoadingDisplayName(true);
+
+      try {
+        const profile = await fetchUserProfile(currentUser.id);
+        if (cancelled) return;
+        const nextDisplayName = profile?.displayName ?? getUserDisplayName(currentUser) ?? "";
+        setDisplayName(nextDisplayName);
+        setDisplayNameInput(nextDisplayName);
+      } catch {
+        if (cancelled) return;
+        const fallbackDisplayName = getUserDisplayName(currentUser) ?? "";
+        setDisplayName(fallbackDisplayName);
+        setDisplayNameInput(fallbackDisplayName);
+      } finally {
+        if (!cancelled) {
+          setIsLoadingDisplayName(false);
+        }
+      }
+    };
+
+    void loadDisplayName();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUser, isConfigured]);
 
   const handleEmailAuth = async () => {
     if (!isConfigured) return;
@@ -171,6 +223,36 @@ export default function SettingsPage() {
     }
   };
 
+  const handleDisplayNameSave = async () => {
+    if (!currentUser) return;
+
+    const trimmedDisplayName = displayNameInput.trim();
+
+    if (!trimmedDisplayName) {
+      showToast(t("settings.displayNameRequired"));
+      return;
+    }
+
+    if (!isValidDisplayName(trimmedDisplayName)) {
+      showToast(t("settings.displayNameInvalidRule"));
+      return;
+    }
+
+    setIsUpdatingDisplayName(true);
+
+    try {
+      const nextDisplayName = await updateMyDisplayName(currentUser.id, trimmedDisplayName);
+      setDisplayName(nextDisplayName);
+      setDisplayNameInput(nextDisplayName);
+      displayNameDrawer.close();
+      showToast(t("settings.displayNameUpdated"));
+    } catch {
+      showToast(t("settings.displayNameUpdateFailed"));
+    } finally {
+      setIsUpdatingDisplayName(false);
+    }
+  };
+
   const userLabel =
     getUserAccountLabel(currentUser) ??
     (getUserProvider(currentUser) === "google"
@@ -222,6 +304,29 @@ export default function SettingsPage() {
               <p className="mt-1 text-sm text-base-content/60">{t("settings.accountGuestSyncHint")}</p>
             )}
           </div>
+
+          {isConfigured && !isLoadingSession && !isSyncingData && currentUser ? (
+            <div>
+              <p className="label-text font-medium">{t("settings.displayNameLabel")}</p>
+              <div className="mt-2 flex items-center justify-between gap-3 rounded-[1.25rem] border border-base-300 bg-base-200 px-4 py-4">
+                <p className="text-sm text-base-content/80">
+                  {isLoadingDisplayName ? t("settings.authChecking") : displayName || t("settings.displayNameEmpty")}
+                </p>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-primary"
+                  onClick={() => {
+                    setDisplayNameInput(displayName);
+                    displayNameDrawer.open();
+                  }}
+                  disabled={isLoadingDisplayName}
+                >
+                  <Pencil className="size-4" />
+                  {t("settings.changeDisplayName")}
+                </button>
+              </div>
+            </div>
+          ) : null}
 
           {isConfigured && !isLoadingSession && !isSyncingData && !currentUser ? (
             <div className="space-y-3">
@@ -295,6 +400,40 @@ export default function SettingsPage() {
               {option.label}
             </button>
           ))}
+        </div>
+      </BottomSheet>
+
+      <BottomSheet
+        open={displayNameDrawer.isOpen}
+        onClose={() => {
+          if (isUpdatingDisplayName) return;
+          displayNameDrawer.close();
+        }}
+        title={t("settings.displayNameTitle")}
+      >
+        <div className="space-y-4 pb-4">
+          <label className="form-control gap-2">
+            <span className="label-text font-medium">{t("settings.displayNameLabel")}</span>
+            <input
+              value={displayNameInput}
+              onChange={(event) => setDisplayNameInput(event.target.value)}
+              placeholder={t("settings.displayNamePlaceholder")}
+              className="input input-bordered w-full"
+              maxLength={20}
+            />
+          </label>
+
+          <p className="text-sm text-base-content/60">{t("settings.displayNameInvalidRule")}</p>
+
+          <button
+            type="button"
+            className="btn btn-primary w-full"
+            disabled={isUpdatingDisplayName}
+            onClick={() => void handleDisplayNameSave()}
+          >
+            {isUpdatingDisplayName ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
+            {t("settings.displayNameSave")}
+          </button>
         </div>
       </BottomSheet>
     </div>

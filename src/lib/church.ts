@@ -369,6 +369,56 @@ async function fetchProfilesForUserIds(userIds: string[]) {
   return makeProfileMap((data ?? []) as UserProfileRow[]);
 }
 
+export async function fetchUserProfile(userId: string): Promise<ChurchUserProfile | null> {
+  const supabase = createBrowserSupabaseClient();
+  const { data, error } = await supabase
+    .from("user_profiles")
+    .select("user_id, display_name, email, avatar_url")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error) throw error;
+
+  const row = data as UserProfileRow | null;
+  if (!row) return null;
+
+  return {
+    userId: row.user_id,
+    displayName: row.display_name?.trim() || row.email?.trim() || `${row.user_id.slice(0, 8)}...`,
+    email: row.email ?? null,
+    avatarUrl: row.avatar_url ?? null,
+  };
+}
+
+export async function updateMyDisplayName(userId: string, displayName: string) {
+  const trimmedDisplayName = displayName.trim();
+  const supabase = createBrowserSupabaseClient();
+
+  const { error: profileError } = await supabase.from("user_profiles").upsert(
+    {
+      user_id: userId,
+      display_name: trimmedDisplayName,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "user_id" },
+  );
+
+  if (profileError) throw profileError;
+
+  const { error: authError } = await supabase.auth.updateUser({
+    data: {
+      full_name: trimmedDisplayName,
+      name: trimmedDisplayName,
+      nickname: trimmedDisplayName,
+      preferred_username: trimmedDisplayName,
+    },
+  });
+
+  if (authError) throw authError;
+
+  return trimmedDisplayName;
+}
+
 export async function syncUserProfileFromAuthUser(user: User) {
   const supabase = createBrowserSupabaseClient();
   const displayName = getUserDisplayName(user) ?? user.email ?? user.id.slice(0, 8);
