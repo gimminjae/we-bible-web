@@ -1,8 +1,8 @@
 "use client";
 
-import { Plus } from "lucide-react";
 import Link from "next/link";
 
+import { Plus } from "@/components/icons";
 import { LoadingScreen } from "@/components/ui/loading-screen";
 import { useHeader } from "@/hooks/use-header";
 import { usePrayers } from "@/hooks/use-prayers";

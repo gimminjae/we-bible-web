@@ -1,8 +1,8 @@
 "use client";
 
-import { ChevronDown, CircleHelp } from "lucide-react";
 import { useMemo, useState } from "react";
 
+import { ChevronDown, CircleHelp } from "@/components/icons";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { getChapterCountForDate, getStreakUpToYesterday, type GrassColorTheme } from "@/lib/grass";
 import { formatShortDate } from "@/lib/date";

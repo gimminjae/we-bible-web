@@ -1,9 +1,9 @@
 "use client";
 
-import { Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { notFound, useParams, useRouter } from "next/navigation";
 
+import { Pencil, Trash2 } from "@/components/icons";
 import { LoadingScreen } from "@/components/ui/loading-screen";
 import { useHeader } from "@/hooks/use-header";
 import { usePrayers } from "@/hooks/use-prayers";

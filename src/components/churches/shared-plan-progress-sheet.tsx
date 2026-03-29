@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 
+import { BookOpenCheck, BookOpenText, Check } from "@/components/icons";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { useAppSettings } from "@/contexts/app-settings";
 import { BIBLE_BOOKS, type GoalStatus } from "@/lib/plan";
@@ -73,9 +74,11 @@ export function SharedPlanProgressSheet({
 
           <div className="tabs tabs-boxed bg-base-200">
             <button type="button" className={`tab flex-1 ${activeTab === "ot" ? "tab-active" : ""}`} onClick={() => setActiveTab("ot")}>
+              <BookOpenText className="size-4" />
               {t("bibleDrawer.oldTestament")}
             </button>
             <button type="button" className={`tab flex-1 ${activeTab === "nt" ? "tab-active" : ""}`} onClick={() => setActiveTab("nt")}>
+              <BookOpenCheck className="size-4" />
               {t("bibleDrawer.newTestament")}
             </button>
           </div>
@@ -111,6 +114,7 @@ export function SharedPlanProgressSheet({
                           )
                         }
                       >
+                        <Check className="size-4" />
                         {t("mypage.checkAll")}
                       </button>
                     ) : null}
@@ -162,6 +166,7 @@ export function SharedPlanProgressSheet({
                 }
               }}
             >
+              <Check className="size-4" />
               {t("mypage.savePlan")}
             </button>
           ) : null}

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 
+import { House } from "@/components/icons";
 import { useHeader } from "@/hooks/use-header";
 
 export default function NotFound() {
@@ -21,6 +22,7 @@ export default function NotFound() {
         <h1 className="mt-3 text-3xl font-semibold">Page not found</h1>
         <p className="mt-3 text-sm text-base-content/60">The requested route does not exist in we-bible-web.</p>
         <Link href="/" className="btn btn-primary mt-6">
+          <House className="size-4" />
           Back to Bible
         </Link>
       </div>

@@ -1,8 +1,8 @@
 ﻿"use client";
 
-import { ChevronDown, ChevronLeft, ChevronRight, Heart, HeartOff, NotebookPen, Type } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
+import { BookOpenText, ChevronDown, ChevronLeft, ChevronRight, Copy, Heart, HeartOff, Languages, NotebookPen, Type } from "@/components/icons";
 import { MemoSheet } from "@/components/memos/memo-sheet";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { LoadingScreen } from "@/components/ui/loading-screen";
@@ -118,6 +118,7 @@ export default function BibleReaderPage() {
                 bookPickerDrawer.open();
               }}
             >
+              <BookOpenText className="size-4" />
               {bookName} {bible.chapter}
             </button>
             <button
@@ -125,6 +126,7 @@ export default function BibleReaderPage() {
               className="btn btn-sm btn-ghost rounded-2xl border border-base-300"
               onClick={languagePickerDrawer.open}
             >
+              <Languages className="size-4" />
               {langLabel}
             </button>
           </div>
@@ -342,6 +344,7 @@ export default function BibleReaderPage() {
               <NotebookPen className="size-4" />
             </button>
             <button type="button" className="btn btn-primary rounded-full px-5" onClick={handleCopy}>
+              <Copy className="size-4" />
               {t("common.copy")}
             </button>
           </div>
@@ -404,6 +407,7 @@ export default function BibleReaderPage() {
           <div className="space-y-4 pb-4">
             <div className="flex items-center justify-between">
               <button type="button" className="btn btn-sm btn-ghost" onClick={() => setBookPickerStep("book")}>
+                <ChevronLeft className="size-4" />
                 {t("common.back")}
               </button>
               <h3 className="text-sm font-semibold">{getBookName(pickerBook.bookCode, appLanguage)}</h3>

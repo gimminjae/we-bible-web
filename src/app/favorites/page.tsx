@@ -1,8 +1,8 @@
 "use client";
 
-import { Copy, Heart, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
+import { Copy, Heart, Trash2 } from "@/components/icons";
 import { copyText } from "@/lib/clipboard";
 import { formatShortDateTime } from "@/lib/date";
 import { getBookName } from "@/services/bible";

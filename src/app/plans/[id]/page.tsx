@@ -1,10 +1,10 @@
 "use client";
 
-import { Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { notFound, useParams, useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
+import { BookOpenCheck, BookOpenText, Check, Pencil, Trash2 } from "@/components/icons";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { LoadingScreen } from "@/components/ui/loading-screen";
 import { useAppSettings } from "@/contexts/app-settings";
@@ -109,9 +109,11 @@ export default function PlanDetailPage() {
 
         <div className="tabs tabs-boxed bg-base-200">
           <button type="button" className={`tab flex-1 ${activeTab === "ot" ? "tab-active" : ""}`} onClick={() => setActiveTab("ot")}>
+            <BookOpenText className="size-4" />
             {t("bibleDrawer.oldTestament")}
           </button>
           <button type="button" className={`tab flex-1 ${activeTab === "nt" ? "tab-active" : ""}`} onClick={() => setActiveTab("nt")}>
+            <BookOpenCheck className="size-4" />
             {t("bibleDrawer.newTestament")}
           </button>
         </div>
@@ -134,6 +136,7 @@ export default function PlanDetailPage() {
                       <p className="text-sm text-base-content/55">{readCount}/{book.maxChapter}</p>
                     </div>
                     <button type="button" className="btn btn-sm btn-ghost border border-base-300" onClick={() => openBookEditor(book.bookCode)}>
+                      <Pencil className="size-4" />
                       {t("mypage.editPlan")}
                     </button>
                   </div>
@@ -201,6 +204,7 @@ export default function PlanDetailPage() {
                   bookEditorDrawer.close();
                 }}
               >
+                <Check className="size-4" />
                 {t("mypage.savePlan")}
               </button>
               <button
@@ -213,6 +217,7 @@ export default function PlanDetailPage() {
                   })
                 }
               >
+                <Check className="size-4" />
                 {t("mypage.checkAll")}
               </button>
             </div>

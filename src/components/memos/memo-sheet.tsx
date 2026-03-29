@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { Check, X } from "@/components/icons";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { useI18n } from "@/utils/i18n";
 
@@ -67,9 +68,11 @@ export function MemoSheet({
 
         <div className="grid grid-cols-2 gap-3 pt-2">
           <button type="button" className="btn btn-ghost" onClick={onClose}>
+            <X className="size-4" />
             {t("memoDrawer.cancel")}
           </button>
           <button type="button" className="btn btn-primary" onClick={handleSave}>
+            <Check className="size-4" />
             {t("memoDrawer.save")}
           </button>
         </div>

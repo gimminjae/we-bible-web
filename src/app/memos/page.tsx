@@ -1,8 +1,8 @@
 "use client";
 
-import { Copy, Plus } from "lucide-react";
 import Link from "next/link";
 
+import { Copy, Plus } from "@/components/icons";
 import { MemoSheet } from "@/components/memos/memo-sheet";
 import { LoadingScreen } from "@/components/ui/loading-screen";
 import { useDrawer } from "@/hooks/use-drawer";

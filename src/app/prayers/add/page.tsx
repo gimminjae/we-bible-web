@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { Check } from "@/components/icons";
 import { LoadingScreen } from "@/components/ui/loading-screen";
 import { useHeader } from "@/hooks/use-header";
 import { usePrayers } from "@/hooks/use-prayers";
@@ -34,6 +35,7 @@ export default function AddPrayerPage() {
             router.replace(`/prayers/${id}`);
           }}
         >
+          <Check className="size-4" />
           {t("prayerDrawer.save")}
         </button>
       ),

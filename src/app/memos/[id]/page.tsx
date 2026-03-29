@@ -1,9 +1,9 @@
 "use client";
 
-import { Copy, Pencil, Trash2 } from "lucide-react";
 import { notFound, useParams, useRouter } from "next/navigation";
 import { useMemo } from "react";
 
+import { Copy, Pencil, Trash2 } from "@/components/icons";
 import { MemoSheet } from "@/components/memos/memo-sheet";
 import { LoadingScreen } from "@/components/ui/loading-screen";
 import { useDrawer } from "@/hooks/use-drawer";

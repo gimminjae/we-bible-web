@@ -1,10 +1,10 @@
 "use client";
 
-import { Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { notFound, useParams, useRouter } from "next/navigation";
 import { useCallback, useMemo, useState } from "react";
 
+import { Pencil, Trash2 } from "@/components/icons";
 import { ChurchRoleBadge } from "@/components/churches/role-badge";
 import { SharedPlanProgressSheet } from "@/components/churches/shared-plan-progress-sheet";
 import { LoadingScreen } from "@/components/ui/loading-screen";

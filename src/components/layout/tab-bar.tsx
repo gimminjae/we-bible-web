@@ -1,9 +1,9 @@
 "use client";
 
-import { BookOpenText, Building2, Settings, UserRound } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { BookOpenText, Building2, Settings, UserRound } from "@/components/icons";
 import { cn } from "@/utils/cn";
 import { useI18n } from "@/utils/i18n";
 

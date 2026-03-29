@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 
+import { Check, Plus } from "@/components/icons";
 import { BIBLE_CATEGORY_KEYS, CATEGORY_BOOK_CODES, type BibleCategoryKey } from "@/utils/bible-categories";
 import { getBookName } from "@/services/bible";
 import { BIBLE_BOOKS, calcTotalReadCount, createDefaultPlanDates } from "@/lib/plan";
@@ -145,6 +146,7 @@ export function PlanForm({ initialValues, submitLabel, onSubmit }: PlanFormProps
         </div>
 
         <button type="button" className="btn btn-sm btn-ghost border border-base-300" onClick={toggleSelectAllByCategory}>
+          <Plus className="size-4" />
           {categoryLabel} {t("planDrawer.selectAll")}
         </button>
 
@@ -166,6 +168,7 @@ export function PlanForm({ initialValues, submitLabel, onSubmit }: PlanFormProps
       </div>
 
       <button type="button" className="btn btn-primary w-full" disabled={!canSubmit} onClick={handleSubmit}>
+        <Check className="size-4" />
         {submitLabel}
       </button>
     </div>

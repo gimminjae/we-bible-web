@@ -1,9 +1,9 @@
 "use client";
 
-import { ChevronLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef } from "react";
 
+import { ChevronLeft } from "@/components/icons";
 import { DEFAULT_HEADER_HEIGHT, useHeaderContext } from "@/contexts/header-context";
 import { cn } from "@/utils/cn";
 

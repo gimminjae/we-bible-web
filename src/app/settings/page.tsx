@@ -1,9 +1,9 @@
 "use client";
 
-import { ChevronDown, Loader2, LogOut, Moon, Sun } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
+import { ChevronDown, GoogleBrand, KakaoBrand, Languages, Loader2, LogIn, LogOut, Moon, Sun, UserPlus } from "@/components/icons";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { useAuth } from "@/contexts/auth-context";
 import { useAppSettings } from "@/contexts/app-settings";
@@ -188,7 +188,10 @@ export default function SettingsPage() {
           <div>
             <p className="label-text font-medium">{t("settings.systemLanguage")}</p>
             <button type="button" className="btn btn-ghost mt-2 w-full justify-between border border-base-300" onClick={languagePickerDrawer.open}>
-              <span>{LANGUAGE_OPTIONS.find((item) => item.value === appLanguage)?.label ?? "한국어"}</span>
+              <span className="flex items-center gap-2">
+                <Languages className="size-4" />
+                {LANGUAGE_OPTIONS.find((item) => item.value === appLanguage)?.label ?? "한국어"}
+              </span>
               <ChevronDown className="size-4" />
             </button>
           </div>
@@ -240,7 +243,7 @@ export default function SettingsPage() {
               ) : null}
 
               <button type="button" className="btn btn-primary w-full" onClick={() => void handleEmailAuth()} disabled={isSubmitting}>
-                {isSubmitting ? <Loader2 className="size-4 animate-spin" /> : null}
+                {isSubmitting ? <Loader2 className="size-4 animate-spin" /> : isSignUpMode ? <UserPlus className="size-4" /> : <LogIn className="size-4" />}
                 {isSignUpMode ? t("settings.signUp") : t("settings.signIn")}
               </button>
 
@@ -250,14 +253,17 @@ export default function SettingsPage() {
                 onClick={() => setIsSignUpMode((prev) => !prev)}
                 disabled={isSubmitting}
               >
+                {isSignUpMode ? <LogIn className="size-4" /> : <UserPlus className="size-4" />}
                 {isSignUpMode ? t("settings.switchToSignIn") : t("settings.switchToSignUp")}
               </button>
 
               <div className="grid grid-cols-2 gap-3">
                 <button type="button" className="btn btn-outline" onClick={() => void handleSocialLogin("google")} disabled={isSubmitting}>
+                  <GoogleBrand className="size-4" />
                   {t("settings.googleLogin")}
                 </button>
                 <button type="button" className="btn btn-outline" onClick={() => void handleSocialLogin("kakao")} disabled={isSubmitting}>
+                  <KakaoBrand className="size-4" />
                   {t("settings.kakaoLogin")}
                 </button>
               </div>
@@ -285,6 +291,7 @@ export default function SettingsPage() {
                 languagePickerDrawer.close();
               }}
             >
+              <Languages className="size-4" />
               {option.label}
             </button>
           ))}

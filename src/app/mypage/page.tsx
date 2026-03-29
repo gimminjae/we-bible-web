@@ -1,8 +1,8 @@
 "use client";
 
-import { BookHeart, BookOpenCheck, Building2, ChevronRight, NotebookText, Sparkles } from "lucide-react";
 import Link from "next/link";
 
+import { BookHeart, BookOpenCheck, Building2, ChevronRight, NotebookText, Sparkles } from "@/components/icons";
 import { BibleGrass } from "@/components/mypage/bible-grass";
 import { useHeader } from "@/hooks/use-header";
 import { useI18n } from "@/utils/i18n";

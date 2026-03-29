@@ -1,9 +1,9 @@
 "use client";
 
-import { Plus, Trash2 } from "lucide-react";
 import { notFound, useParams, useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
+import { Check, Plus, Trash2 } from "@/components/icons";
 import { LoadingScreen } from "@/components/ui/loading-screen";
 import { useHeader } from "@/hooks/use-header";
 import { usePrayers } from "@/hooks/use-prayers";
@@ -66,6 +66,7 @@ function EditPrayerForm({
             onSaved();
           }}
         >
+          <Check className="size-4" />
           {t("prayerDrawer.save")}
         </button>
       ),

@@ -1,10 +1,10 @@
 "use client";
 
-import { Loader2, Plus, Search } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { Building2, Loader2, Plus, Search } from "@/components/icons";
 import { ChurchRoleBadge } from "@/components/churches/role-badge";
 import { LoadingScreen } from "@/components/ui/loading-screen";
 import { useAuth } from "@/contexts/auth-context";
@@ -180,6 +180,7 @@ export default function ChurchesPage() {
 
                     {church.isMember ? (
                       <Link href={`/churches/${church.id}`} className="btn btn-sm btn-primary">
+                        <Building2 className="size-4" />
                         {t("church.enter")}
                       </Link>
                     ) : church.pendingRequestStatus === "pending" ? (
@@ -203,7 +204,7 @@ export default function ChurchesPage() {
                           }
                         }}
                       >
-                        {submittingJoinChurchId === church.id ? <Loader2 className="size-4 animate-spin" /> : null}
+                        {submittingJoinChurchId === church.id ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
                         {t("church.requestJoin")}
                       </button>
                     )}

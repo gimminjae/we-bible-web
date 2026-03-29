@@ -1,10 +1,10 @@
 "use client";
 
-import { Check, Loader2, LogOut, Plus, Shield, ShieldOff, UserMinus, Users, X } from "lucide-react";
 import Link from "next/link";
 import { notFound, useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { BookOpenCheck, Building2, Check, Loader2, LogOut, Plus, Shield, ShieldOff, UserMinus, Users, X } from "@/components/icons";
 import { ChurchRoleBadge } from "@/components/churches/role-badge";
 import { LoadingScreen } from "@/components/ui/loading-screen";
 import { useAuth } from "@/contexts/auth-context";
@@ -101,12 +101,15 @@ export default function ChurchDetailPage() {
 
         <div className="tabs tabs-boxed bg-base-200">
           <button type="button" className={`tab flex-1 ${activeTab === "members" ? "tab-active" : ""}`} onClick={() => setActiveTab("members")}>
+            <Users className="size-4" />
             {t("church.tabs.members")}
           </button>
           <button type="button" className={`tab flex-1 ${activeTab === "plans" ? "tab-active" : ""}`} onClick={() => setActiveTab("plans")}>
+            <BookOpenCheck className="size-4" />
             {t("church.tabs.plans")}
           </button>
           <button type="button" className={`tab flex-1 ${activeTab === "teams" ? "tab-active" : ""}`} onClick={() => setActiveTab("teams")}>
+            <Building2 className="size-4" />
             {t("church.tabs.teams")}
           </button>
         </div>
@@ -336,7 +339,7 @@ export default function ChurchDetailPage() {
                             }
                           }}
                         >
-                          {processingKey === `team-${member.userId}` ? <Loader2 className="size-4 animate-spin" /> : null}
+                          {processingKey === `team-${member.userId}` ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
                           {t("church.saveTeamAssignment")}
                         </button>
                       </div>
@@ -498,7 +501,7 @@ export default function ChurchDetailPage() {
                           }
                         }}
                       >
-                        {processingKey === `leader-${team.id}` ? <Loader2 className="size-4 animate-spin" /> : null}
+                        {processingKey === `leader-${team.id}` ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
                         {t("church.saveLeader")}
                       </button>
                     </div>
