@@ -8,24 +8,7 @@ import { useHeader } from "@/hooks/use-header";
 import { usePrayers } from "@/hooks/use-prayers";
 import { useI18n } from "@/utils/i18n";
 import { formatShortDateTime } from "@/lib/date";
-
-function buildPrayerLabel(
-  requester: string,
-  target: string,
-  t: (key: string) => string,
-) {
-  const trimmedRequester = requester.trim();
-  const trimmedTarget = target.trim();
-  if (trimmedTarget && trimmedRequester && trimmedRequester !== trimmedTarget) {
-    return t("mypage.prayerRequestedForFormat")
-      .replace("{requester}", trimmedRequester)
-      .replace("{target}", trimmedTarget);
-  }
-  if (trimmedTarget || trimmedRequester) {
-    return t("mypage.prayerForTargetFormat").replace("{target}", trimmedTarget || trimmedRequester);
-  }
-  return "-";
-}
+import { buildPrayerLabel } from "@/lib/prayer";
 
 export default function PrayersPage() {
   const { t } = useI18n();

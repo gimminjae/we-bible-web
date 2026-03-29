@@ -5,10 +5,14 @@ import { useMemo } from "react";
 
 import { useAuth } from "@/contexts/auth-context";
 import {
+  addChurchPrayerContent as addChurchPrayerContentRequest,
   approveChurchJoinRequest,
   createChurch,
+  createChurchPrayer as createChurchPrayerRequest,
   createSharedPlan,
   createTeam,
+  deleteChurchPrayer as deleteChurchPrayerRequest,
+  deleteChurchPrayerContent as deleteChurchPrayerContentRequest,
   deleteSharedPlan,
   fetchChurchDetail,
   fetchMyChurches,
@@ -18,6 +22,7 @@ import {
   rejectChurchJoinRequest,
   requestChurchJoin,
   searchChurches,
+  updateChurchPrayer as updateChurchPrayerRequest,
   updateChurchMemberRole,
   updateChurchMemberTeam,
   updateSharedPlan,
@@ -195,6 +200,60 @@ export function useChurchActions() {
         });
         await invalidateChurchQueries(args.churchId);
         return teamId;
+      },
+      async createChurchPrayer(args: {
+        churchId: string;
+        teamId?: string | null;
+        requester: string;
+        target: string;
+        content: string;
+      }) {
+        const prayerId = await createChurchPrayerRequest({
+          churchId: args.churchId,
+          teamId: args.teamId ?? null,
+          currentUserId: requireUserId(dataUserId),
+          requester: args.requester,
+          target: args.target,
+          content: args.content,
+        });
+        await invalidateChurchQueries(args.churchId);
+        return prayerId;
+      },
+      async updateChurchPrayer(args: {
+        churchId: string;
+        prayerId: string;
+        requester: string;
+        target: string;
+      }) {
+        await updateChurchPrayerRequest({
+          prayerId: args.prayerId,
+          requester: args.requester,
+          target: args.target,
+        });
+        await invalidateChurchQueries(args.churchId);
+      },
+      async deleteChurchPrayer(args: { churchId: string; prayerId: string }) {
+        await deleteChurchPrayerRequest(args.prayerId);
+        await invalidateChurchQueries(args.churchId);
+      },
+      async addChurchPrayerContent(args: {
+        churchId: string;
+        prayerId: string;
+        content: string;
+      }) {
+        await addChurchPrayerContentRequest({
+          prayerId: args.prayerId,
+          currentUserId: requireUserId(dataUserId),
+          content: args.content,
+        });
+        await invalidateChurchQueries(args.churchId);
+      },
+      async deleteChurchPrayerContent(args: {
+        churchId: string;
+        contentId: string;
+      }) {
+        await deleteChurchPrayerContentRequest(args.contentId);
+        await invalidateChurchQueries(args.churchId);
       },
       async createSharedPlan(args: {
         churchId: string;

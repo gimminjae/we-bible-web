@@ -2,15 +2,20 @@
 
 import Link from "next/link";
 import { notFound, useParams, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
-import { BookOpenCheck, Building2, Check, Loader2, LogOut, Plus, Shield, ShieldOff, UserMinus, Users, X } from "@/components/icons";
+import { BookOpenCheck, Building2, Check, Heart, Loader2, LogOut, Pencil, Plus, Shield, ShieldOff, Trash2, UserMinus, Users, X } from "@/components/icons";
+import { ChurchPrayerSheet } from "@/components/churches/church-prayer-sheet";
 import { ChurchRoleBadge } from "@/components/churches/role-badge";
 import { LoadingScreen } from "@/components/ui/loading-screen";
 import { useAuth } from "@/contexts/auth-context";
 import { useChurchActions, useChurchDetail } from "@/hooks/use-churches";
+import { useDrawer } from "@/hooks/use-drawer";
 import { useHeader } from "@/hooks/use-header";
 import { useToast } from "@/hooks/use-toast";
+import { formatShortDateTime } from "@/lib/date";
+import { buildPrayerLabel } from "@/lib/prayer";
+import type { ChurchPrayer } from "@/lib/church";
 import { useI18n } from "@/utils/i18n";
 
 export default function ChurchDetailPage() {
@@ -20,13 +25,102 @@ export default function ChurchDetailPage() {
   const { showToast } = useToast();
   const { dataUserId } = useAuth();
   const { churchDetail, isLoading, error } = useChurchDetail(params.id);
-  const { approveJoinRequest, rejectJoinRequest, updateMemberRole, updateMemberTeam, updateTeamLeader, removeMember, leaveChurch, createTeam } = useChurchActions();
-  const [activeTab, setActiveTab] = useState<"members" | "plans" | "teams">("members");
+  const {
+    approveJoinRequest,
+    rejectJoinRequest,
+    updateMemberRole,
+    updateMemberTeam,
+    updateTeamLeader,
+    removeMember,
+    leaveChurch,
+    createTeam,
+    createChurchPrayer,
+    updateChurchPrayer,
+    deleteChurchPrayer,
+    addChurchPrayerContent,
+    deleteChurchPrayerContent,
+  } = useChurchActions();
+  const [activeTab, setActiveTab] = useState<"members" | "plans" | "prayers" | "teams">("members");
   const [creatingTeamName, setCreatingTeamName] = useState("");
   const [processingKey, setProcessingKey] = useState<string | null>(null);
   const [selectedRequestTeamIds, setSelectedRequestTeamIds] = useState<Record<string, string>>({});
   const [selectedMemberTeamIds, setSelectedMemberTeamIds] = useState<Record<string, string>>({});
   const [selectedTeamLeaderIds, setSelectedTeamLeaderIds] = useState<Record<string, string>>({});
+  const [expandedPrayerId, setExpandedPrayerId] = useState<string | null>(null);
+  const [selectedPrayer, setSelectedPrayer] = useState<ChurchPrayer | null>(null);
+  const createPrayerDrawer = useDrawer();
+  const editPrayerDrawer = useDrawer();
+  const appendPrayerDrawer = useDrawer();
+
+  const prayerAudienceOptions = useMemo(() => {
+    if (!churchDetail?.church.myRole) return [];
+
+    const options = [
+      {
+        value: "",
+        label: t("church.churchPrayerAudienceOption"),
+      },
+    ];
+
+    if (churchDetail.church.isSuperAdmin || churchDetail.church.isDeputyAdmin) {
+      return [
+        ...options,
+        ...churchDetail.teams.map((team) => ({
+          value: team.id,
+          label: t("church.teamPrayerAudienceOption").replace("{team}", team.name),
+        })),
+      ];
+    }
+
+    if (churchDetail.church.myTeamId && churchDetail.church.myTeamName) {
+      return [
+        ...options,
+        {
+          value: churchDetail.church.myTeamId,
+          label: t("church.teamPrayerAudienceOption").replace("{team}", churchDetail.church.myTeamName),
+        },
+      ];
+    }
+
+    return options;
+  }, [churchDetail, t]);
+
+  const churchWidePrayers = useMemo(
+    () => churchDetail?.prayers.filter((prayer) => prayer.teamId == null) ?? [],
+    [churchDetail],
+  );
+
+  const teamPrayerGroups = useMemo(() => {
+    if (!churchDetail) return [];
+
+    const groupMap = new Map<string, { teamId: string; teamName: string; prayers: ChurchPrayer[] }>();
+
+    for (const prayer of churchDetail.prayers) {
+      if (!prayer.teamId || !prayer.teamName) continue;
+
+      const existing = groupMap.get(prayer.teamId);
+      if (existing) {
+        existing.prayers.push(prayer);
+      } else {
+        groupMap.set(prayer.teamId, {
+          teamId: prayer.teamId,
+          teamName: prayer.teamName,
+          prayers: [prayer],
+        });
+      }
+    }
+
+    return [...groupMap.values()].sort((left, right) =>
+      left.teamName.localeCompare(right.teamName, "ko"),
+    );
+  }, [churchDetail]);
+
+  const activeTabTitle = useMemo(() => {
+    if (activeTab === "members") return t("church.tabs.members");
+    if (activeTab === "plans") return t("church.tabs.plans");
+    if (activeTab === "prayers") return t("church.tabs.prayers");
+    return t("church.tabs.teams");
+  }, [activeTab, t]);
 
   useHeader(
     () => ({
@@ -100,18 +194,48 @@ export default function ChurchDetailPage() {
         </section>
 
         <div className="tabs tabs-boxed bg-base-200">
-          <button type="button" className={`tab flex-1 ${activeTab === "members" ? "tab-active" : ""}`} onClick={() => setActiveTab("members")}>
+          <button
+            type="button"
+            aria-label={t("church.tabs.members")}
+            title={t("church.tabs.members")}
+            className={`tab flex-1 ${activeTab === "members" ? "tab-active" : ""}`}
+            onClick={() => setActiveTab("members")}
+          >
             <Users className="size-4" />
-            {t("church.tabs.members")}
           </button>
-          <button type="button" className={`tab flex-1 ${activeTab === "plans" ? "tab-active" : ""}`} onClick={() => setActiveTab("plans")}>
+          <button
+            type="button"
+            aria-label={t("church.tabs.plans")}
+            title={t("church.tabs.plans")}
+            className={`tab flex-1 ${activeTab === "plans" ? "tab-active" : ""}`}
+            onClick={() => setActiveTab("plans")}
+          >
             <BookOpenCheck className="size-4" />
-            {t("church.tabs.plans")}
           </button>
-          <button type="button" className={`tab flex-1 ${activeTab === "teams" ? "tab-active" : ""}`} onClick={() => setActiveTab("teams")}>
+          <button
+            type="button"
+            aria-label={t("church.tabs.prayers")}
+            title={t("church.tabs.prayers")}
+            className={`tab flex-1 ${activeTab === "prayers" ? "tab-active" : ""}`}
+            onClick={() => setActiveTab("prayers")}
+          >
+            <Heart className="size-4" />
+          </button>
+          <button
+            type="button"
+            aria-label={t("church.tabs.teams")}
+            title={t("church.tabs.teams")}
+            className={`tab flex-1 ${activeTab === "teams" ? "tab-active" : ""}`}
+            onClick={() => setActiveTab("teams")}
+          >
             <Building2 className="size-4" />
-            {t("church.tabs.teams")}
           </button>
+        </div>
+
+        <div className="px-1">
+          <h2 className="text-base font-semibold tracking-[-0.01em] text-base-content">
+            {activeTabTitle}
+          </h2>
         </div>
 
         {activeTab === "members" ? (
@@ -391,6 +515,377 @@ export default function ChurchDetailPage() {
           </div>
         ) : null}
 
+        {activeTab === "prayers" ? (
+          <div className="space-y-4">
+            {prayerAudienceOptions.length > 0 ? (
+              <button type="button" className="btn btn-primary w-full" onClick={createPrayerDrawer.open}>
+                <Plus className="size-4" />
+                {t("church.createPrayer")}
+              </button>
+            ) : null}
+
+            {churchWidePrayers.length === 0 && teamPrayerGroups.length === 0 ? (
+              <div className="rounded-[1.75rem] border border-dashed border-base-300 bg-base-100 px-5 py-10 text-center text-sm text-base-content/55">
+                {t("church.emptySharedPrayers")}
+              </div>
+            ) : null}
+
+            {churchWidePrayers.length > 0 ? (
+              <section className="space-y-3">
+                <div className="flex items-center gap-2 px-1">
+                  <Heart className="size-4 text-primary" />
+                  <h2 className="font-semibold">{t("church.churchPrayerSection")}</h2>
+                </div>
+
+                {churchWidePrayers.map((prayer) => (
+                  <section key={prayer.id} className="rounded-[1.75rem] border border-base-300 bg-base-100 shadow-sm">
+                    <button
+                      type="button"
+                      className="flex w-full items-start justify-between gap-3 px-5 py-5 text-left"
+                      onClick={() =>
+                        setExpandedPrayerId((previous) =>
+                          previous === prayer.id ? null : prayer.id,
+                        )
+                      }
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-sm font-semibold text-primary">
+                            {buildPrayerLabel(prayer.requester, prayer.target, t)}
+                          </p>
+                          <span className="rounded-full bg-primary/10 px-2 py-1 text-[11px] font-semibold text-primary">
+                            {t("church.churchPrayerScopeShort")}
+                          </span>
+                        </div>
+                        <p className="mt-3 line-clamp-2 text-sm leading-7">
+                          {prayer.latestContent || t("church.noPrayerContents")}
+                        </p>
+                        <p className="mt-3 text-xs text-base-content/45">
+                          {formatShortDateTime(prayer.updatedAt)}
+                        </p>
+                      </div>
+                      <div className="rounded-2xl bg-base-200 px-3 py-2 text-sm font-medium text-base-content/70">
+                        {t("church.prayerContentCount").replace("{count}", String(prayer.contentCount))}
+                      </div>
+                    </button>
+
+                    {expandedPrayerId === prayer.id ? (
+                      <div className="space-y-4 border-t border-base-300 px-5 py-5">
+                        <div className="grid gap-3 sm:grid-cols-3">
+                          <div className="rounded-2xl bg-base-200 px-4 py-3">
+                            <p className="text-xs font-medium text-base-content/55">{t("mypage.prayerRequester")}</p>
+                            <p className="mt-2 text-sm font-semibold">{prayer.requester || "-"}</p>
+                          </div>
+                          <div className="rounded-2xl bg-base-200 px-4 py-3">
+                            <p className="text-xs font-medium text-base-content/55">{t("mypage.prayerTarget")}</p>
+                            <p className="mt-2 text-sm font-semibold">{prayer.target || "-"}</p>
+                          </div>
+                          <div className="rounded-2xl bg-base-200 px-4 py-3">
+                            <p className="text-xs font-medium text-base-content/55">{t("church.prayerCreatedByLabel")}</p>
+                            <p className="mt-2 text-sm font-semibold">{prayer.createdByName}</p>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-primary"
+                            onClick={() => {
+                              setSelectedPrayer(prayer);
+                              appendPrayerDrawer.open();
+                            }}
+                          >
+                            <Plus className="size-4" />
+                            {t("church.addPrayerContent")}
+                          </button>
+                          {prayer.canManagePrayer ? (
+                            <>
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-outline"
+                                onClick={() => {
+                                  setSelectedPrayer(prayer);
+                                  editPrayerDrawer.open();
+                                }}
+                              >
+                                <Pencil className="size-4" />
+                                {t("church.editPrayer")}
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-outline"
+                                disabled={processingKey === `delete-prayer-${prayer.id}`}
+                                onClick={async () => {
+                                  if (!window.confirm(t("church.deletePrayerConfirm"))) return;
+                                  setProcessingKey(`delete-prayer-${prayer.id}`);
+                                  try {
+                                    await deleteChurchPrayer({
+                                      churchId: churchDetail.church.id,
+                                      prayerId: prayer.id,
+                                    });
+                                    showToast(t("toast.churchPrayerDeleted"));
+                                    if (expandedPrayerId === prayer.id) {
+                                      setExpandedPrayerId(null);
+                                    }
+                                  } catch (prayerError) {
+                                    showToast(prayerError instanceof Error ? prayerError.message : t("church.prayerDeleteFailed"));
+                                  } finally {
+                                    setProcessingKey(null);
+                                  }
+                                }}
+                              >
+                                {processingKey === `delete-prayer-${prayer.id}` ? (
+                                  <Loader2 className="size-4 animate-spin" />
+                                ) : (
+                                  <Trash2 className="size-4" />
+                                )}
+                                {t("church.deletePrayer")}
+                              </button>
+                            </>
+                          ) : null}
+                        </div>
+
+                        <div className="space-y-3">
+                          <div className="flex items-center gap-2">
+                            <Heart className="size-4 text-primary" />
+                            <h3 className="font-semibold">{t("church.prayerContents")}</h3>
+                          </div>
+
+                          {prayer.contents.length === 0 ? (
+                            <div className="rounded-2xl border border-dashed border-base-300 px-4 py-6 text-center text-sm text-base-content/55">
+                              {t("church.noPrayerContents")}
+                            </div>
+                          ) : (
+                            prayer.contents.map((content) => (
+                              <div key={content.id} className="rounded-2xl border border-base-300 bg-base-200 p-4">
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="min-w-0 flex-1">
+                                    <p className="text-sm leading-7">{content.content}</p>
+                                    <p className="mt-3 text-xs text-base-content/45">
+                                      {content.createdByName} · {formatShortDateTime(content.registeredAt)}
+                                    </p>
+                                  </div>
+
+                                  {content.canManage ? (
+                                    <button
+                                      type="button"
+                                      className="btn btn-sm btn-ghost btn-circle border border-base-300"
+                                      disabled={processingKey === `delete-prayer-content-${content.id}`}
+                                      onClick={async () => {
+                                        if (!window.confirm(t("church.deletePrayerContentConfirm"))) return;
+                                        setProcessingKey(`delete-prayer-content-${content.id}`);
+                                        try {
+                                          await deleteChurchPrayerContent({
+                                            churchId: churchDetail.church.id,
+                                            contentId: content.id,
+                                          });
+                                          showToast(t("toast.churchPrayerContentDeleted"));
+                                        } catch (contentError) {
+                                          showToast(contentError instanceof Error ? contentError.message : t("church.prayerContentDeleteFailed"));
+                                        } finally {
+                                          setProcessingKey(null);
+                                        }
+                                      }}
+                                    >
+                                      {processingKey === `delete-prayer-content-${content.id}` ? (
+                                        <Loader2 className="size-4 animate-spin" />
+                                      ) : (
+                                        <Trash2 className="size-4" />
+                                      )}
+                                    </button>
+                                  ) : null}
+                                </div>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    ) : null}
+                  </section>
+                ))}
+              </section>
+            ) : null}
+
+            {teamPrayerGroups.map((group) => (
+              <section key={group.teamId} className="space-y-3">
+                <div className="flex items-center gap-2 px-1">
+                  <Heart className="size-4 text-primary" />
+                  <h2 className="font-semibold">
+                    {t("church.teamPrayerSectionTitle").replace("{team}", group.teamName)}
+                  </h2>
+                </div>
+
+                {group.prayers.map((prayer) => (
+                  <section key={prayer.id} className="rounded-[1.75rem] border border-base-300 bg-base-100 shadow-sm">
+                    <button
+                      type="button"
+                      className="flex w-full items-start justify-between gap-3 px-5 py-5 text-left"
+                      onClick={() =>
+                        setExpandedPrayerId((previous) =>
+                          previous === prayer.id ? null : prayer.id,
+                        )
+                      }
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-sm font-semibold text-primary">
+                            {buildPrayerLabel(prayer.requester, prayer.target, t)}
+                          </p>
+                          <span className="rounded-full bg-secondary/15 px-2 py-1 text-[11px] font-semibold text-secondary">
+                            {t("church.teamPrayerScopeShort").replace("{team}", prayer.teamName ?? "-")}
+                          </span>
+                        </div>
+                        <p className="mt-3 line-clamp-2 text-sm leading-7">
+                          {prayer.latestContent || t("church.noPrayerContents")}
+                        </p>
+                        <p className="mt-3 text-xs text-base-content/45">
+                          {formatShortDateTime(prayer.updatedAt)}
+                        </p>
+                      </div>
+                      <div className="rounded-2xl bg-base-200 px-3 py-2 text-sm font-medium text-base-content/70">
+                        {t("church.prayerContentCount").replace("{count}", String(prayer.contentCount))}
+                      </div>
+                    </button>
+
+                    {expandedPrayerId === prayer.id ? (
+                      <div className="space-y-4 border-t border-base-300 px-5 py-5">
+                        <div className="grid gap-3 sm:grid-cols-3">
+                          <div className="rounded-2xl bg-base-200 px-4 py-3">
+                            <p className="text-xs font-medium text-base-content/55">{t("mypage.prayerRequester")}</p>
+                            <p className="mt-2 text-sm font-semibold">{prayer.requester || "-"}</p>
+                          </div>
+                          <div className="rounded-2xl bg-base-200 px-4 py-3">
+                            <p className="text-xs font-medium text-base-content/55">{t("mypage.prayerTarget")}</p>
+                            <p className="mt-2 text-sm font-semibold">{prayer.target || "-"}</p>
+                          </div>
+                          <div className="rounded-2xl bg-base-200 px-4 py-3">
+                            <p className="text-xs font-medium text-base-content/55">{t("church.prayerCreatedByLabel")}</p>
+                            <p className="mt-2 text-sm font-semibold">{prayer.createdByName}</p>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-primary"
+                            onClick={() => {
+                              setSelectedPrayer(prayer);
+                              appendPrayerDrawer.open();
+                            }}
+                          >
+                            <Plus className="size-4" />
+                            {t("church.addPrayerContent")}
+                          </button>
+                          {prayer.canManagePrayer ? (
+                            <>
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-outline"
+                                onClick={() => {
+                                  setSelectedPrayer(prayer);
+                                  editPrayerDrawer.open();
+                                }}
+                              >
+                                <Pencil className="size-4" />
+                                {t("church.editPrayer")}
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-outline"
+                                disabled={processingKey === `delete-prayer-${prayer.id}`}
+                                onClick={async () => {
+                                  if (!window.confirm(t("church.deletePrayerConfirm"))) return;
+                                  setProcessingKey(`delete-prayer-${prayer.id}`);
+                                  try {
+                                    await deleteChurchPrayer({
+                                      churchId: churchDetail.church.id,
+                                      prayerId: prayer.id,
+                                    });
+                                    showToast(t("toast.churchPrayerDeleted"));
+                                    if (expandedPrayerId === prayer.id) {
+                                      setExpandedPrayerId(null);
+                                    }
+                                  } catch (prayerError) {
+                                    showToast(prayerError instanceof Error ? prayerError.message : t("church.prayerDeleteFailed"));
+                                  } finally {
+                                    setProcessingKey(null);
+                                  }
+                                }}
+                              >
+                                {processingKey === `delete-prayer-${prayer.id}` ? (
+                                  <Loader2 className="size-4 animate-spin" />
+                                ) : (
+                                  <Trash2 className="size-4" />
+                                )}
+                                {t("church.deletePrayer")}
+                              </button>
+                            </>
+                          ) : null}
+                        </div>
+
+                        <div className="space-y-3">
+                          <div className="flex items-center gap-2">
+                            <Heart className="size-4 text-primary" />
+                            <h3 className="font-semibold">{t("church.prayerContents")}</h3>
+                          </div>
+
+                          {prayer.contents.length === 0 ? (
+                            <div className="rounded-2xl border border-dashed border-base-300 px-4 py-6 text-center text-sm text-base-content/55">
+                              {t("church.noPrayerContents")}
+                            </div>
+                          ) : (
+                            prayer.contents.map((content) => (
+                              <div key={content.id} className="rounded-2xl border border-base-300 bg-base-200 p-4">
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="min-w-0 flex-1">
+                                    <p className="text-sm leading-7">{content.content}</p>
+                                    <p className="mt-3 text-xs text-base-content/45">
+                                      {content.createdByName} · {formatShortDateTime(content.registeredAt)}
+                                    </p>
+                                  </div>
+
+                                  {content.canManage ? (
+                                    <button
+                                      type="button"
+                                      className="btn btn-sm btn-ghost btn-circle border border-base-300"
+                                      disabled={processingKey === `delete-prayer-content-${content.id}`}
+                                      onClick={async () => {
+                                        if (!window.confirm(t("church.deletePrayerContentConfirm"))) return;
+                                        setProcessingKey(`delete-prayer-content-${content.id}`);
+                                        try {
+                                          await deleteChurchPrayerContent({
+                                            churchId: churchDetail.church.id,
+                                            contentId: content.id,
+                                          });
+                                          showToast(t("toast.churchPrayerContentDeleted"));
+                                        } catch (contentError) {
+                                          showToast(contentError instanceof Error ? contentError.message : t("church.prayerContentDeleteFailed"));
+                                        } finally {
+                                          setProcessingKey(null);
+                                        }
+                                      }}
+                                    >
+                                      {processingKey === `delete-prayer-content-${content.id}` ? (
+                                        <Loader2 className="size-4 animate-spin" />
+                                      ) : (
+                                        <Trash2 className="size-4" />
+                                      )}
+                                    </button>
+                                  ) : null}
+                                </div>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    ) : null}
+                  </section>
+                ))}
+              </section>
+            ))}
+          </div>
+        ) : null}
+
         {activeTab === "teams" ? (
           <div className="space-y-4">
             {churchDetail.church.canManageTeams ? (
@@ -539,6 +1034,106 @@ export default function ChurchDetailPage() {
             )}
           </div>
         ) : null}
+
+        <ChurchPrayerSheet
+          key={`create-prayer-${createPrayerDrawer.version}`}
+          open={createPrayerDrawer.isOpen}
+          mode="create"
+          onClose={createPrayerDrawer.close}
+          audienceOptions={prayerAudienceOptions}
+          initialAudienceValue={prayerAudienceOptions[0]?.value ?? ""}
+          isSubmitting={processingKey === "create-prayer"}
+          onSubmit={async (input) => {
+            setProcessingKey("create-prayer");
+            try {
+              await createChurchPrayer({
+                churchId: churchDetail.church.id,
+                teamId: input.teamId,
+                requester: input.requester,
+                target: input.target,
+                content: input.content,
+              });
+              createPrayerDrawer.close();
+              showToast(t("toast.churchPrayerCreated"));
+            } catch (prayerError) {
+              showToast(prayerError instanceof Error ? prayerError.message : t("church.prayerCreateFailed"));
+            } finally {
+              setProcessingKey(null);
+            }
+          }}
+        />
+
+        <ChurchPrayerSheet
+          key={`edit-prayer-${editPrayerDrawer.version}-${selectedPrayer?.id ?? "none"}`}
+          open={editPrayerDrawer.isOpen}
+          mode="edit"
+          onClose={() => {
+            editPrayerDrawer.close();
+            setSelectedPrayer(null);
+          }}
+          prayer={selectedPrayer}
+          isSubmitting={processingKey === "edit-prayer"}
+          onSubmit={async (input) => {
+            if (!selectedPrayer) return;
+
+            setProcessingKey("edit-prayer");
+            try {
+              await updateChurchPrayer({
+                churchId: churchDetail.church.id,
+                prayerId: selectedPrayer.id,
+                requester: input.requester,
+                target: input.target,
+              });
+
+              if (input.content.trim()) {
+                await addChurchPrayerContent({
+                  churchId: churchDetail.church.id,
+                  prayerId: selectedPrayer.id,
+                  content: input.content,
+                });
+              }
+
+              editPrayerDrawer.close();
+              setSelectedPrayer(null);
+              showToast(t("toast.churchPrayerUpdated"));
+            } catch (prayerError) {
+              showToast(prayerError instanceof Error ? prayerError.message : t("church.prayerUpdateFailed"));
+            } finally {
+              setProcessingKey(null);
+            }
+          }}
+        />
+
+        <ChurchPrayerSheet
+          key={`append-prayer-${appendPrayerDrawer.version}-${selectedPrayer?.id ?? "none"}`}
+          open={appendPrayerDrawer.isOpen}
+          mode="append"
+          onClose={() => {
+            appendPrayerDrawer.close();
+            setSelectedPrayer(null);
+          }}
+          prayer={selectedPrayer}
+          isSubmitting={processingKey === "append-prayer-content"}
+          onSubmit={async (input) => {
+            if (!selectedPrayer) return;
+
+            setProcessingKey("append-prayer-content");
+            try {
+              await addChurchPrayerContent({
+                churchId: churchDetail.church.id,
+                prayerId: selectedPrayer.id,
+                content: input.content,
+              });
+              appendPrayerDrawer.close();
+              setSelectedPrayer(null);
+              showToast(t("toast.churchPrayerContentAdded"));
+            } catch (prayerError) {
+              showToast(prayerError instanceof Error ? prayerError.message : t("church.prayerContentAddFailed"));
+            } finally {
+              setProcessingKey(null);
+            }
+          }}
+        />
       </div>
     </div>
   );

@@ -53,6 +53,37 @@ export type ChurchJoinRequest = {
   processedBy: ChurchUserProfile | null;
 };
 
+export type ChurchPrayerScope = "church" | "team";
+
+export type ChurchPrayerContent = {
+  id: string;
+  prayerId: string;
+  content: string;
+  registeredAt: string;
+  createdByUserId: string;
+  createdByName: string;
+  canManage: boolean;
+};
+
+export type ChurchPrayer = {
+  id: string;
+  churchId: string;
+  teamId: string | null;
+  teamName: string | null;
+  scope: ChurchPrayerScope;
+  requester: string;
+  target: string;
+  createdByUserId: string;
+  createdByName: string;
+  createdAt: string;
+  updatedAt: string;
+  latestContent: string;
+  contentCount: number;
+  contents: ChurchPrayerContent[];
+  canManagePrayer: boolean;
+  canAddContent: boolean;
+};
+
 export type SharedPlanSummary = {
   id: string;
   planName: string;
@@ -122,6 +153,7 @@ export type ChurchDetail = {
   };
   members: ChurchMembership[];
   pendingJoinRequests: ChurchJoinRequest[];
+  prayers: ChurchPrayer[];
   teams: ChurchTeam[];
   plans: SharedPlanSummary[];
 };
@@ -224,6 +256,25 @@ type PlanProgressRow = {
   updated_at: string | null;
 };
 
+type ChurchPrayerRow = {
+  id: number;
+  church_id: number;
+  team_id: number | null;
+  requester: string | null;
+  target: string | null;
+  created_by_user_id: string;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+type ChurchPrayerContentRow = {
+  id: number;
+  prayer_id: number;
+  created_by_user_id: string;
+  content: string | null;
+  registered_at: string | null;
+};
+
 function toNumber(value: unknown, fallback = 0): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
@@ -282,6 +333,10 @@ function roleOrder(role: ChurchRole) {
   if (role === "super_admin") return 0;
   if (role === "deputy_admin") return 1;
   return 2;
+}
+
+function isChurchAdminRole(role: ChurchRole | null | undefined) {
+  return role === "super_admin" || role === "deputy_admin";
 }
 
 function createProgressPlanRecord(
@@ -352,6 +407,53 @@ function summarizeSharedPlan(args: {
     memberCount: progressRows.length,
     averageGoalPercent,
     myGoalPercent: myPlan ? createProgressPlanRecord(planRow, myPlan).goalPercent : null,
+  };
+}
+
+function summarizeChurchPrayer(args: {
+  prayerRow: ChurchPrayerRow;
+  contentRows: ChurchPrayerContentRow[];
+  currentUserId: string;
+  currentUserRole: ChurchRole | null;
+  profileMap: Map<string, ChurchUserProfile>;
+  teamMap: Map<number, TeamRow>;
+}): ChurchPrayer {
+  const { prayerRow, contentRows, currentUserId, currentUserRole, profileMap, teamMap } = args;
+  const canManagePrayer =
+    prayerRow.created_by_user_id === currentUserId ||
+    isChurchAdminRole(currentUserRole);
+
+  const contents = contentRows.map((row) => ({
+    id: String(row.id),
+    prayerId: String(row.prayer_id),
+    content: row.content ?? "",
+    registeredAt: row.registered_at ?? "",
+    createdByUserId: row.created_by_user_id,
+    createdByName:
+      profileMap.get(row.created_by_user_id)?.displayName ??
+      `${row.created_by_user_id.slice(0, 8)}...`,
+    canManage: canManagePrayer || row.created_by_user_id === currentUserId,
+  }));
+
+  return {
+    id: String(prayerRow.id),
+    churchId: String(prayerRow.church_id),
+    teamId: prayerRow.team_id == null ? null : String(prayerRow.team_id),
+    teamName: prayerRow.team_id == null ? null : teamMap.get(prayerRow.team_id)?.name ?? null,
+    scope: prayerRow.team_id == null ? "church" : "team",
+    requester: prayerRow.requester?.trim() ?? "",
+    target: prayerRow.target?.trim() ?? "",
+    createdByUserId: prayerRow.created_by_user_id,
+    createdByName:
+      profileMap.get(prayerRow.created_by_user_id)?.displayName ??
+      `${prayerRow.created_by_user_id.slice(0, 8)}...`,
+    createdAt: prayerRow.created_at ?? "",
+    updatedAt: prayerRow.updated_at ?? prayerRow.created_at ?? "",
+    latestContent: contents[0]?.content ?? "",
+    contentCount: contents.length,
+    contents,
+    canManagePrayer,
+    canAddContent: true,
   };
 }
 
@@ -665,6 +767,7 @@ export async function fetchChurchDetail(churchId: string, currentUserId: string)
     teamsResult,
     plansResult,
     requestsResult,
+    prayersResult,
   ] = await Promise.all([
     supabase
       .from("churches")
@@ -693,9 +796,15 @@ export async function fetchChurchDetail(churchId: string, currentUserId: string)
       .eq("church_id", numericChurchId)
       .eq("status", "pending")
       .order("requested_at", { ascending: false }),
+    supabase
+      .from("church_prayers")
+      .select("id, church_id, team_id, requester, target, created_by_user_id, created_at, updated_at")
+      .eq("church_id", numericChurchId)
+      .order("updated_at", { ascending: false })
+      .order("id", { ascending: false }),
   ]);
 
-  for (const result of [churchResult, membershipsResult, teamsResult, plansResult, requestsResult]) {
+  for (const result of [churchResult, membershipsResult, teamsResult, plansResult, requestsResult, prayersResult]) {
     if (result.error) throw result.error;
   }
 
@@ -708,6 +817,7 @@ export async function fetchChurchDetail(churchId: string, currentUserId: string)
   const teams = (teamsResult.data ?? []) as TeamRow[];
   const plans = (plansResult.data ?? []) as SharedPlanRow[];
   const joinRequests = (requestsResult.data ?? []) as JoinRequestRow[];
+  const prayers = (prayersResult.data ?? []) as ChurchPrayerRow[];
 
   const planIds = plans.map((plan) => plan.id);
   const { data: progressData, error: progressError } = planIds.length
@@ -719,12 +829,32 @@ export async function fetchChurchDetail(churchId: string, currentUserId: string)
 
   if (progressError) throw progressError;
 
+  const prayerIds = prayers.map((prayer) => prayer.id);
+  const { data: prayerContentsData, error: prayerContentsError } = prayerIds.length
+    ? await supabase
+        .from("church_prayer_contents")
+        .select("id, prayer_id, created_by_user_id, content, registered_at")
+        .in("prayer_id", prayerIds)
+        .order("registered_at", { ascending: false })
+        .order("id", { ascending: false })
+    : { data: [], error: null };
+
+  if (prayerContentsError) throw prayerContentsError;
+
   const progressRows = (progressData ?? []) as PlanProgressRow[];
   const progressMap = new Map<number, PlanProgressRow[]>();
   for (const row of progressRows) {
     const existing = progressMap.get(row.plan_id);
     if (existing) existing.push(row);
     else progressMap.set(row.plan_id, [row]);
+  }
+
+  const prayerContents = (prayerContentsData ?? []) as ChurchPrayerContentRow[];
+  const prayerContentMap = new Map<number, ChurchPrayerContentRow[]>();
+  for (const row of prayerContents) {
+    const existing = prayerContentMap.get(row.prayer_id);
+    if (existing) existing.push(row);
+    else prayerContentMap.set(row.prayer_id, [row]);
   }
 
   const userIds = [
@@ -736,11 +866,14 @@ export async function fetchChurchDetail(churchId: string, currentUserId: string)
     ...joinRequests.map((item) => item.requester_user_id),
     ...joinRequests.map((item) => item.processed_by_user_id),
     ...plans.map((item) => item.user_id),
+    ...prayers.map((item) => item.created_by_user_id),
+    ...prayerContents.map((item) => item.created_by_user_id),
   ].filter((value): value is string => Boolean(value));
 
   const profileMap = await fetchProfilesForUserIds(userIds);
   const teamMap = new Map(teams.map((team) => [team.id, team]));
   const myMembership = memberships.find((membership) => membership.user_id === currentUserId) ?? null;
+  const myRole = myMembership?.role ?? null;
 
   const memberList = memberships
     .map((membership) => ({
@@ -811,8 +944,17 @@ export async function fetchChurchDetail(churchId: string, currentUserId: string)
     processedBy: request.processed_by_user_id ? (profileMap.get(request.processed_by_user_id) ?? null) : null,
   }));
 
-  const myRole = myMembership?.role ?? null;
   const myTeamName = myMembership?.team_id == null ? null : teamMap.get(myMembership.team_id)?.name ?? null;
+  const prayerSummaries = prayers.map((prayer) =>
+    summarizeChurchPrayer({
+      prayerRow: prayer,
+      contentRows: prayerContentMap.get(prayer.id) ?? [],
+      currentUserId,
+      currentUserRole: myRole,
+      profileMap,
+      teamMap,
+    }),
+  );
 
   return {
     church: {
@@ -835,6 +977,7 @@ export async function fetchChurchDetail(churchId: string, currentUserId: string)
     },
     members: memberList,
     pendingJoinRequests,
+    prayers: prayerSummaries,
     teams: teamSummaries,
     plans: planSummaries.filter((plan) => plan.teamId == null),
   };
@@ -967,6 +1110,103 @@ export async function createTeam(args: {
 
   if (error) throw error;
   return String((data as { id: number }).id);
+}
+
+export async function createChurchPrayer(args: {
+  churchId: string;
+  teamId?: string | null;
+  currentUserId: string;
+  requester: string;
+  target: string;
+  content: string;
+}) {
+  const supabase = createBrowserSupabaseClient();
+  const timestamp = formatDateTime(new Date());
+
+  const { data, error } = await supabase
+    .from("church_prayers")
+    .insert({
+      church_id: Number(args.churchId),
+      team_id: args.teamId ? Number(args.teamId) : null,
+      requester: args.requester.trim(),
+      target: args.target.trim(),
+      created_by_user_id: args.currentUserId,
+      created_at: timestamp,
+      updated_at: timestamp,
+    })
+    .select("id")
+    .single();
+
+  if (error) throw error;
+
+  const prayerId = String((data as { id: number }).id);
+  const trimmedContent = args.content.trim();
+
+  if (trimmedContent) {
+    const { error: contentError } = await supabase.from("church_prayer_contents").insert({
+      prayer_id: Number(prayerId),
+      created_by_user_id: args.currentUserId,
+      content: trimmedContent,
+      registered_at: timestamp,
+    });
+
+    if (contentError) throw contentError;
+  }
+
+  return prayerId;
+}
+
+export async function updateChurchPrayer(args: {
+  prayerId: string;
+  requester: string;
+  target: string;
+}) {
+  const supabase = createBrowserSupabaseClient();
+  const { error } = await supabase
+    .from("church_prayers")
+    .update({
+      requester: args.requester.trim(),
+      target: args.target.trim(),
+      updated_at: formatDateTime(new Date()),
+    })
+    .eq("id", Number(args.prayerId));
+
+  if (error) throw error;
+}
+
+export async function deleteChurchPrayer(prayerId: string) {
+  const supabase = createBrowserSupabaseClient();
+  const { error } = await supabase.from("church_prayers").delete().eq("id", Number(prayerId));
+  if (error) throw error;
+}
+
+export async function addChurchPrayerContent(args: {
+  prayerId: string;
+  currentUserId: string;
+  content: string;
+}) {
+  const trimmedContent = args.content.trim();
+  if (!trimmedContent) return;
+
+  const supabase = createBrowserSupabaseClient();
+  const { error } = await supabase.from("church_prayer_contents").insert({
+    prayer_id: Number(args.prayerId),
+    created_by_user_id: args.currentUserId,
+    content: trimmedContent,
+    registered_at: formatDateTime(new Date()),
+  });
+
+  if (error) throw error;
+}
+
+export async function deleteChurchPrayerContent(contentId: string) {
+  const supabase = createBrowserSupabaseClient();
+  const { error } = await supabase
+    .from("church_prayer_contents")
+    .delete()
+    .eq("id", Number(contentId));
+
+  if (error) throw error;
 }
 
 export async function createSharedPlan(args: {
