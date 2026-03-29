@@ -3,6 +3,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
 
+import { ConfirmDialogRoot } from "@/components/ui/confirm-dialog";
 import { LoadingScreen } from "@/components/ui/loading-screen";
 import { ToastViewport } from "@/components/ui/toast-viewport";
 import { AppSettingsProvider } from "@/contexts/app-settings";
@@ -40,6 +41,7 @@ export function Providers({ children }: { children: ReactNode }) {
         <AppSettingsProvider>
           <HeaderProvider>
             <ProvidersGate>{children}</ProvidersGate>
+            <ConfirmDialogRoot />
             <ToastViewport />
           </HeaderProvider>
         </AppSettingsProvider>

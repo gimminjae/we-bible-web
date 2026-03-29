@@ -9,6 +9,7 @@ import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { LoadingScreen } from "@/components/ui/loading-screen";
 import { useAppSettings } from "@/contexts/app-settings";
 import { useBibleGrass } from "@/hooks/use-bible-grass";
+import { useConfirm } from "@/hooks/use-confirm";
 import { useDrawer } from "@/hooks/use-drawer";
 import { useHeader } from "@/hooks/use-header";
 import { usePlans } from "@/hooks/use-plans";
@@ -23,6 +24,7 @@ export default function PlanDetailPage() {
   const { appLanguage } = useAppSettings();
   const { t } = useI18n();
   const { showToast } = useToast();
+  const { confirmDestructive } = useConfirm();
   const { plans, deletePlan, updatePlanGoalStatus, isLoading, error } = usePlans();
   const { isLoading: isGrassLoading, error: grassError } = useBibleGrass();
   const plan = plans.find((item) => item.id === params.id);
@@ -45,7 +47,13 @@ export default function PlanDetailPage() {
           <button
             type="button"
             className="btn btn-sm btn-error"
-            onClick={() => {
+            onClick={async () => {
+              const confirmed = await confirmDestructive({
+                message: t("mypage.deletePlanConfirm"),
+                confirmText: t("mypage.deletePlan"),
+                cancelText: t("mypage.deleteCancel"),
+              });
+              if (!confirmed) return;
               deletePlan(plan.id);
               showToast(t("toast.planDeleted"));
               router.back();
@@ -57,7 +65,7 @@ export default function PlanDetailPage() {
         </>
       ) : null,
     }),
-    [deletePlan, plan, router, showToast, t],
+    [confirmDestructive, deletePlan, plan, router, showToast, t],
   );
 
   const selectedBook = useMemo(() => (selectedBookIndex === null ? null : BIBLE_BOOKS[selectedBookIndex]), [selectedBookIndex]);

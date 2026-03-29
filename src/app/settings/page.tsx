@@ -8,6 +8,7 @@ import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { useAuth } from "@/contexts/auth-context";
 import { useAppSettings } from "@/contexts/app-settings";
 import { useDrawer } from "@/hooks/use-drawer";
+import { useConfirm } from "@/hooks/use-confirm";
 import { useHeader } from "@/hooks/use-header";
 import { fetchUserProfile, updateMyDisplayName } from "@/lib/church";
 import {
@@ -42,6 +43,7 @@ export default function SettingsPage() {
   const { theme, setTheme, appLanguage, setAppLanguage } = useAppSettings();
   const { t } = useI18n();
   const { showToast } = useToast();
+  const { confirm } = useConfirm();
   const languagePickerDrawer = useDrawer();
   const displayNameDrawer = useDrawer();
   const router = useRouter();
@@ -212,6 +214,16 @@ export default function SettingsPage() {
 
   const handleLogout = async () => {
     if (!isConfigured) return;
+
+    const confirmed = await confirm({
+      title: t("settings.logoutConfirmTitle"),
+      message: t("settings.logoutConfirmMessage"),
+      confirmText: t("settings.logoutConfirm"),
+      cancelText: t("settings.logoutCancel"),
+    });
+
+    if (!confirmed) return;
+
     setIsSubmitting(true);
 
     try {

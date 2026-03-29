@@ -5,6 +5,7 @@ import { notFound, useParams, useRouter } from "next/navigation";
 
 import { Pencil, Trash2 } from "@/components/icons";
 import { LoadingScreen } from "@/components/ui/loading-screen";
+import { useConfirm } from "@/hooks/use-confirm";
 import { useHeader } from "@/hooks/use-header";
 import { usePrayers } from "@/hooks/use-prayers";
 import { useToast } from "@/hooks/use-toast";
@@ -16,6 +17,7 @@ export default function PrayerDetailPage() {
   const router = useRouter();
   const { t } = useI18n();
   const { showToast } = useToast();
+  const { confirmDestructive } = useConfirm();
   const { prayers, deletePrayer, deletePrayerContent, isLoading, error } = usePrayers();
   const prayer = prayers.find((item) => item.id === params.id);
 
@@ -33,7 +35,13 @@ export default function PrayerDetailPage() {
           <button
             type="button"
             className="btn btn-sm btn-error"
-            onClick={() => {
+            onClick={async () => {
+              const confirmed = await confirmDestructive({
+                message: t("mypage.deletePrayerConfirm"),
+                confirmText: t("mypage.deletePrayer"),
+                cancelText: t("mypage.deleteCancel"),
+              });
+              if (!confirmed) return;
               deletePrayer(prayer.id);
               showToast(t("toast.prayerDeleted"));
               router.back();
@@ -45,7 +53,7 @@ export default function PrayerDetailPage() {
         </>
       ) : null,
     }),
-    [deletePrayer, prayer, router, showToast, t],
+    [confirmDestructive, deletePrayer, prayer, router, showToast, t],
   );
 
   if (error) {
@@ -86,7 +94,13 @@ export default function PrayerDetailPage() {
                     <button
                       type="button"
                       className="btn btn-sm btn-ghost btn-circle border border-base-300"
-                      onClick={() => {
+                      onClick={async () => {
+                        const confirmed = await confirmDestructive({
+                          message: t("mypage.deletePrayerContentConfirm"),
+                          confirmText: t("mypage.deleteConfirm"),
+                          cancelText: t("mypage.deleteCancel"),
+                        });
+                        if (!confirmed) return;
                         deletePrayerContent(prayer.id, content.id);
                         showToast(t("toast.prayerContentDeleted"));
                       }}

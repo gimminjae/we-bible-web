@@ -10,6 +10,7 @@ import { SharedPlanProgressSheet } from "@/components/churches/shared-plan-progr
 import { LoadingScreen } from "@/components/ui/loading-screen";
 import { useBibleGrass } from "@/hooks/use-bible-grass";
 import { useChurchActions, useSharedPlanDetail } from "@/hooks/use-churches";
+import { useConfirm } from "@/hooks/use-confirm";
 import { useHeader } from "@/hooks/use-header";
 import { useToast } from "@/hooks/use-toast";
 import { useAppStore } from "@/store/app-store";
@@ -20,6 +21,7 @@ export default function ChurchPlanDetailPage() {
   const router = useRouter();
   const { t } = useI18n();
   const { showToast } = useToast();
+  const { confirmDestructive } = useConfirm();
   const { sharedPlanDetail, isLoading, error } = useSharedPlanDetail(params.id, params.planId);
   const { isLoading: isGrassLoading, error: grassError } = useBibleGrass();
   const { deleteSharedPlan, updateSharedPlanProgress } = useChurchActions();
@@ -29,6 +31,13 @@ export default function ChurchPlanDetailPage() {
   const canEditPlan = Boolean(sharedPlanDetail?.canEditPlan);
 
   const handleDeletePlan = useCallback(async () => {
+    const confirmed = await confirmDestructive({
+      message: t("mypage.deletePlanConfirm"),
+      confirmText: t("mypage.deletePlan"),
+      cancelText: t("mypage.deleteCancel"),
+    });
+    if (!confirmed) return;
+
     try {
       await deleteSharedPlan({
         churchId: params.id,
@@ -39,7 +48,7 @@ export default function ChurchPlanDetailPage() {
     } catch (deleteError) {
       showToast(deleteError instanceof Error ? deleteError.message : t("church.planDeleteFailed"));
     }
-  }, [deleteSharedPlan, params.id, params.planId, router, showToast, t]);
+  }, [confirmDestructive, deleteSharedPlan, params.id, params.planId, router, showToast, t]);
 
   const headerActions = useMemo(() => {
     if (!canEditPlan) {

@@ -6,6 +6,7 @@ import { useMemo } from "react";
 import { Copy, Pencil, Trash2 } from "@/components/icons";
 import { MemoSheet } from "@/components/memos/memo-sheet";
 import { LoadingScreen } from "@/components/ui/loading-screen";
+import { useConfirm } from "@/hooks/use-confirm";
 import { useDrawer } from "@/hooks/use-drawer";
 import { useHeader } from "@/hooks/use-header";
 import { useMemos } from "@/hooks/use-memos";
@@ -23,6 +24,7 @@ export default function MemoDetailPage() {
   const router = useRouter();
   const { t } = useI18n();
   const { showToast } = useToast();
+  const { confirmDestructive } = useConfirm();
   const { memos, updateMemo, deleteMemo, isLoading, error } = useMemos();
   const memo = useMemo(() => memos.find((item) => item.id === params.id), [memos, params.id]);
   const editDrawer = useDrawer();
@@ -56,8 +58,14 @@ export default function MemoDetailPage() {
           <button
             type="button"
             className="btn btn-sm btn-error"
-            onClick={() => {
+            onClick={async () => {
               if (!memo) return;
+              const confirmed = await confirmDestructive({
+                message: t("mypage.deleteMemoConfirm"),
+                confirmText: t("mypage.deleteConfirm"),
+                cancelText: t("mypage.deleteCancel"),
+              });
+              if (!confirmed) return;
               deleteMemo(memo.id);
               showToast(t("toast.memoDeleted"));
               router.back();
@@ -69,7 +77,7 @@ export default function MemoDetailPage() {
         </>
       ),
     }),
-    [copyTextValue, deleteMemo, memo, router, showToast, t],
+    [confirmDestructive, copyTextValue, deleteMemo, memo, router, showToast, t],
   );
 
   if (error) {

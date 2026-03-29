@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 
 import { Check, Plus, Trash2 } from "@/components/icons";
 import { LoadingScreen } from "@/components/ui/loading-screen";
+import { useConfirm } from "@/hooks/use-confirm";
 import { useHeader } from "@/hooks/use-header";
 import { usePrayers } from "@/hooks/use-prayers";
 import { useToast } from "@/hooks/use-toast";
@@ -37,6 +38,7 @@ function EditPrayerForm({
   updatePrayerContent,
   addPrayerContent,
 }: EditPrayerFormProps) {
+  const { confirmDestructive } = useConfirm();
   const [requester, setRequester] = useState(prayer.requester);
   const [target, setTarget] = useState(prayer.target);
   const [contents, setContents] = useState<ContentItem[]>(
@@ -109,8 +111,16 @@ function EditPrayerForm({
                 <button
                   type="button"
                   className="btn btn-sm btn-ghost btn-circle border border-base-300"
-                  onClick={() => {
-                    if (item.id) setDeletedIds((previous) => [...previous, item.id!]);
+                  onClick={async () => {
+                    if (item.id) {
+                      const confirmed = await confirmDestructive({
+                        message: t("mypage.deletePrayerContentConfirm"),
+                        confirmText: t("mypage.deleteConfirm"),
+                        cancelText: t("mypage.deleteCancel"),
+                      });
+                      if (!confirmed) return;
+                      setDeletedIds((previous) => [...previous, item.id!]);
+                    }
                     setContents((previous) => previous.filter((_, contentIndex) => contentIndex !== index));
                   }}
                 >

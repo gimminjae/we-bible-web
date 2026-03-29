@@ -9,6 +9,7 @@ import { getBookName } from "@/services/bible";
 import { LoadingScreen } from "@/components/ui/loading-screen";
 import { useAppSettings } from "@/contexts/app-settings";
 import { useBibleState } from "@/hooks/use-bible-state";
+import { useConfirm } from "@/hooks/use-confirm";
 import { useFavorites } from "@/hooks/use-favorites";
 import { useHeader } from "@/hooks/use-header";
 import { useToast } from "@/hooks/use-toast";
@@ -19,6 +20,7 @@ export default function FavoritesPage() {
   const { appLanguage } = useAppSettings();
   const { t } = useI18n();
   const { showToast } = useToast();
+  const { confirmDestructive } = useConfirm();
   const { goToBookChapter } = useBibleState();
   const { favorites, removeFavorites, isLoading, error } = useFavorites();
 
@@ -82,7 +84,13 @@ export default function FavoritesPage() {
                   <button
                     type="button"
                     className="btn btn-sm btn-ghost btn-circle border border-base-300"
-                    onClick={() => {
+                    onClick={async () => {
+                      const confirmed = await confirmDestructive({
+                        message: t("mypage.deleteFavoriteConfirm"),
+                        confirmText: t("mypage.deleteFavorite"),
+                        cancelText: t("mypage.deleteCancel"),
+                      });
+                      if (!confirmed) return;
                       removeFavorites(item.bookCode, item.chapter, [item.verse]);
                       showToast(t("toast.favoriteRemoved"));
                     }}

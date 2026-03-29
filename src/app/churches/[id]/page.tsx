@@ -10,6 +10,7 @@ import { ChurchRoleBadge } from "@/components/churches/role-badge";
 import { LoadingScreen } from "@/components/ui/loading-screen";
 import { useAuth } from "@/contexts/auth-context";
 import { useChurchActions, useChurchDetail } from "@/hooks/use-churches";
+import { useConfirm } from "@/hooks/use-confirm";
 import { useDrawer } from "@/hooks/use-drawer";
 import { useHeader } from "@/hooks/use-header";
 import { useToast } from "@/hooks/use-toast";
@@ -23,6 +24,7 @@ export default function ChurchDetailPage() {
   const router = useRouter();
   const { t } = useI18n();
   const { showToast } = useToast();
+  const { confirmDestructive } = useConfirm();
   const { dataUserId } = useAuth();
   const { churchDetail, isLoading, error } = useChurchDetail(params.id);
   const {
@@ -172,7 +174,12 @@ export default function ChurchDetailPage() {
                   className="btn btn-sm btn-outline"
                   disabled={processingKey === "leave-church"}
                   onClick={async () => {
-                    if (!window.confirm(t("church.leaveConfirm"))) return;
+                    const confirmed = await confirmDestructive({
+                      message: t("church.leaveConfirm"),
+                      confirmText: t("church.leave"),
+                      cancelText: t("common.cancel"),
+                    });
+                    if (!confirmed) return;
                     setProcessingKey("leave-church");
                     try {
                       await leaveChurch(churchDetail.church.id);
@@ -402,7 +409,12 @@ export default function ChurchDetailPage() {
                             className="btn btn-sm btn-outline"
                             disabled={processingKey === `remove-${member.userId}`}
                             onClick={async () => {
-                              if (!window.confirm(t("church.removeMemberConfirm").replace("{name}", member.profile.displayName))) return;
+                              const confirmed = await confirmDestructive({
+                                message: t("church.removeMemberConfirm").replace("{name}", member.profile.displayName),
+                                confirmText: t("church.removeMember"),
+                                cancelText: t("common.cancel"),
+                              });
+                              if (!confirmed) return;
                               setProcessingKey(`remove-${member.userId}`);
                               try {
                                 await removeMember({
@@ -616,7 +628,12 @@ export default function ChurchDetailPage() {
                                 className="btn btn-sm btn-outline"
                                 disabled={processingKey === `delete-prayer-${prayer.id}`}
                                 onClick={async () => {
-                                  if (!window.confirm(t("church.deletePrayerConfirm"))) return;
+                                  const confirmed = await confirmDestructive({
+                                    message: t("church.deletePrayerConfirm"),
+                                    confirmText: t("church.deletePrayer"),
+                                    cancelText: t("common.cancel"),
+                                  });
+                                  if (!confirmed) return;
                                   setProcessingKey(`delete-prayer-${prayer.id}`);
                                   try {
                                     await deleteChurchPrayer({
@@ -672,7 +689,12 @@ export default function ChurchDetailPage() {
                                       className="btn btn-sm btn-ghost btn-circle border border-base-300"
                                       disabled={processingKey === `delete-prayer-content-${content.id}`}
                                       onClick={async () => {
-                                        if (!window.confirm(t("church.deletePrayerContentConfirm"))) return;
+                                        const confirmed = await confirmDestructive({
+                                          message: t("church.deletePrayerContentConfirm"),
+                                          confirmText: t("mypage.deleteConfirm"),
+                                          cancelText: t("common.cancel"),
+                                        });
+                                        if (!confirmed) return;
                                         setProcessingKey(`delete-prayer-content-${content.id}`);
                                         try {
                                           await deleteChurchPrayerContent({
@@ -794,7 +816,12 @@ export default function ChurchDetailPage() {
                                 className="btn btn-sm btn-outline"
                                 disabled={processingKey === `delete-prayer-${prayer.id}`}
                                 onClick={async () => {
-                                  if (!window.confirm(t("church.deletePrayerConfirm"))) return;
+                                  const confirmed = await confirmDestructive({
+                                    message: t("church.deletePrayerConfirm"),
+                                    confirmText: t("church.deletePrayer"),
+                                    cancelText: t("common.cancel"),
+                                  });
+                                  if (!confirmed) return;
                                   setProcessingKey(`delete-prayer-${prayer.id}`);
                                   try {
                                     await deleteChurchPrayer({
@@ -850,7 +877,12 @@ export default function ChurchDetailPage() {
                                       className="btn btn-sm btn-ghost btn-circle border border-base-300"
                                       disabled={processingKey === `delete-prayer-content-${content.id}`}
                                       onClick={async () => {
-                                        if (!window.confirm(t("church.deletePrayerContentConfirm"))) return;
+                                        const confirmed = await confirmDestructive({
+                                          message: t("church.deletePrayerContentConfirm"),
+                                          confirmText: t("mypage.deleteConfirm"),
+                                          cancelText: t("common.cancel"),
+                                        });
+                                        if (!confirmed) return;
                                         setProcessingKey(`delete-prayer-content-${content.id}`);
                                         try {
                                           await deleteChurchPrayerContent({

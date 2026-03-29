@@ -13,6 +13,7 @@ const messages = {
     },
     common: {
       back: '뒤로',
+      cancel: '취소',
       copy: '복사',
       confirm: '확인',
     },
@@ -476,6 +477,7 @@ const messages = {
     },
     common: {
       back: 'Back',
+      cancel: 'Cancel',
       copy: 'Copy',
       confirm: 'OK',
     },

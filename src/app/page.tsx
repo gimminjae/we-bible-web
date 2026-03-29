@@ -8,6 +8,7 @@ import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { LoadingScreen } from "@/components/ui/loading-screen";
 import { useAppSettings } from "@/contexts/app-settings";
 import { useBibleState } from "@/hooks/use-bible-state";
+import { useConfirm } from "@/hooks/use-confirm";
 import { useFavorites } from "@/hooks/use-favorites";
 import { useDrawer } from "@/hooks/use-drawer";
 import { useBibleQuery } from "@/hooks/use-bible-query";
@@ -32,6 +33,7 @@ export default function BibleReaderPage() {
   const { appLanguage } = useAppSettings();
   const { t } = useI18n();
   const { showToast } = useToast();
+  const { confirmDestructive } = useConfirm();
 
   const { bible, setBibleState, goToBookChapter, isLoading: isBibleStateLoading, error: bibleStateError } = useBibleState();
   const { favorites, addFavorites, removeFavorites, isLoading: isFavoritesLoading, error: favoritesError } = useFavorites();
@@ -209,9 +211,15 @@ export default function BibleReaderPage() {
     showToast(t("toast.copySuccess"));
   };
 
-  const handleFavoriteToggle = () => {
+  const handleFavoriteToggle = async () => {
     if (!selectedVerses.length) return;
     if (allSelectedAreFavorites) {
+      const confirmed = await confirmDestructive({
+        message: t("mypage.deleteFavoriteConfirm"),
+        confirmText: t("mypage.deleteFavorite"),
+        cancelText: t("mypage.deleteCancel"),
+      });
+      if (!confirmed) return;
       removeFavorites(bible.bookCode, bible.chapter, selectedVerses);
       showToast(t("toast.favoriteRemoved"));
     } else {
@@ -337,7 +345,7 @@ export default function BibleReaderPage() {
       {selectedVerses.length ? (
         <div className="pointer-events-none fixed inset-x-0 bottom-24 z-20 flex justify-center px-4">
           <div className="pointer-events-auto flex items-center gap-3 rounded-full border border-base-300 bg-base-100 px-3 py-3 shadow-2xl shadow-stone-950/10">
-            <button type="button" className="btn btn-circle btn-sm btn-ghost border border-base-300" onClick={handleFavoriteToggle}>
+            <button type="button" className="btn btn-circle btn-sm btn-ghost border border-base-300" onClick={() => void handleFavoriteToggle()}>
               {allSelectedAreFavorites ? <HeartOff className="size-4" /> : <Heart className="size-4" />}
             </button>
             <button type="button" className="btn btn-circle btn-sm btn-ghost border border-base-300" onClick={memoDrawer.open}>
