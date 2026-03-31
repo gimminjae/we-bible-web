@@ -198,14 +198,18 @@ export default function SettingsPage() {
     setIsSubmitting(true);
 
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
           redirectTo: getOAuthRedirectTo(window.location.origin, "/settings"),
+          skipBrowserRedirect: true,
         },
       });
 
       if (error) throw error;
+      if (!data?.url) throw new Error("OAUTH_URL_MISSING");
+
+      window.location.assign(data.url);
     } catch {
       showToast(provider === "google" ? t("settings.googleLoginFailed") : t("settings.kakaoLoginFailed"));
       setIsSubmitting(false);
